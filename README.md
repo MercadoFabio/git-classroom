@@ -46,3 +46,40 @@ GitHub Classroom Helper es una aplicación web diseñada para facilitar la gesti
     - Navega a la sección "Resumen de Entregas".
     - Ingresa tu token de GitHub y selecciona un classroom.
     - Filtra los datos y descarga el resumen en formato CSV.
+
+
+## Cómo Obtener un Token de GitHub
+
+Para utilizar la aplicación, necesitas un token de acceso personal de GitHub con los permisos adecuados. Sigue estos pasos para generarlo:
+
+1. **Inicia sesión en GitHub**:
+   - Ve a [GitHub](https://github.com) e inicia sesión con tu cuenta.
+
+2. **Accede a la configuración de tu cuenta**:
+   - Haz clic en tu foto de perfil en la esquina superior derecha.
+   - Selecciona **Settings** (Configuración).
+
+3. **Navega a la sección de tokens**:
+   - En el menú lateral izquierdo, selecciona **Developer settings**.
+   - Luego, haz clic en **Personal access tokens** y selecciona **Tokens (classic)**.
+
+4. **Genera un nuevo token**:
+   - Haz clic en el botón **Generate new token**.
+   - Si estás utilizando autenticación de dos factores (2FA), se te pedirá que ingreses un código de verificación.
+
+5. **Configura el token**:
+   - Asigna un nombre descriptivo al token (por ejemplo, "GitHub Classroom Helper").
+   - Establece una fecha de expiración para el token según tus necesidades.
+   - En la sección **Scopes**, selecciona los permisos necesarios:
+      - `read:org` (para acceder a los classrooms).
+      - `repo` (para acceder a los repositorios de los estudiantes).
+      - `read:user` (para leer información básica del usuario).
+
+6. **Genera y guarda el token**:
+   - Haz clic en **Generate token**.
+   - Copia el token generado y guárdalo en un lugar seguro. **No podrás verlo nuevamente después de cerrar esta página.**
+
+7. **Usa el token en la aplicación**:
+   - Ingresa el token en los campos correspondientes de la aplicación para autenticarte y acceder a los datos de GitHub Classroom.
+
+**Nota**: Nunca compartas tu token públicamente ni lo incluyas en repositorios de código. Si crees que tu token ha sido comprometido, revócalo desde la misma sección de configuración.

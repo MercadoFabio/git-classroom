@@ -1,111 +1,140 @@
 <!DOCTYPE html>
-            <html lang="es">
-            <head>
-                <meta charset="UTF-8"/>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-                <title>GitHub Classroom Assignment Helper</title>
-                <link rel="icon" href="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" type="image/png">
-                <script src="https://cdn.tailwindcss.com"></script>
-                <style>
-                    .nav-btn[aria-current="page"] {
-                        color: #1d4ed8;
-                        text-decoration: underline;
-                        font-weight: bold;
-                    }
-                    .loader {
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        height: 100%;
-                    }
-                </style>
-            </head>
-            <body class="flex flex-col min-h-screen bg-gradient-to-br from-sky-100 via-blue-200 to-blue-400">
+<html lang="es">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>GitHub Classroom Assignment Helper</title>
+    <!-- Favicon para la página -->
+    <link rel="icon" href="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" type="image/png">
+    <!-- Importación de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilo para el botón de navegación activo */
+        .nav-btn[aria-current="page"] {
+            color: #1d4ed8;
+            text-decoration: underline;
+            font-weight: bold;
+        }
 
-            <div class="flex h-screen">
-                <!-- Sidebar -->
-                <nav id="sidebar" class="bg-white shadow w-64 flex flex-col fixed inset-y-0 z-20 transform -translate-x-full transition-transform duration-300 lg:translate-x-0">
-                    <div class="px-6 py-4">
-                        <span class="font-bold text-blue-900 text-xl">GitHub Classroom Helper</span>
-                    </div>
-                    <div class="flex-1 px-4 space-y-2">
-                        <button id="nav-create" class="nav-btn w-full text-left font-semibold text-blue-700 hover:text-blue-900 px-4 py-2 rounded-lg hover:bg-blue-100" aria-current="page" type="button">Crear Assignments</button>
-                        <button id="nav-deliveries" class="nav-btn w-full text-left font-semibold text-blue-700 hover:text-blue-900 px-4 py-2 rounded-lg hover:bg-blue-100" type="button">Ver Notas y Entregas</button>
-                        <button id="nav-deliveries-summary" class="nav-btn w-full text-left font-semibold text-blue-700 hover:text-blue-900 px-4 py-2 rounded-lg hover:bg-blue-100" type="button">Resumen de Entregas</button>
-                    </div>
-                </nav>
+        /* Estilo para el loader */
+        .loader {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen bg-gradient-to-br from-sky-100 via-blue-200 to-blue-400">
 
-                <!-- Main Content -->
-                <div class="flex-1 flex flex-col">
-                    <!-- Header -->
-                    <header class="bg-white shadow sticky top-0 z-10 w-full flex items-center justify-between px-4 py-3 lg:hidden">
-                        <span class="font-bold text-blue-900 text-xl">GitHub Classroom Helper</span>
-                        <button id="menu-toggle" class="text-blue-700 hover:text-blue-900 focus:outline-none">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
-                            </svg>
-                        </button>
-                    </header>
+<!-- Botón para abrir el modal de ayuda para obtener el token -->
+<div class="fixed top-4 right-4 z-50">
+    <button id="help-token-btn"
+            class="bg-gradient-to-r from-blue-500 to-blue-700 text-white px-6 py-3 rounded-full shadow-lg hover:from-blue-600 hover:to-blue-800 transition transform hover:scale-105">
+        ¿Cómo obtener el token?
+    </button>
+</div>
 
-                    <main id="spa-views" class="flex-1 flex flex-col items-center py-6 w-full">
-                        <div class="w-full max-w-3xl flex-1 flex flex-col">
-                            <!-- VISTA CREAR ASSIGNMENTS -->
-                            <section id="view-assignments" class="space-y-8 w-full flex-1"></section>
-                            <!-- VISTA VER NOTAS -->
-                            <section id="view-grades" class="space-y-8 w-full flex-1 hidden"></section>
-                            <!-- VISTA RESUMEN DE ENTREGAS -->
-                            <section id="view-deliveries-summary" class="hidden space-y-8 py-8"></section>
-                        </div>
-                        <div id="spinner-overlay" class="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50 z-50 hidden">
-                            <div class="loader">
-                                <div class="h-8 w-8 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
-                            </div>
-                        </div>
-                    </main>
+<!-- Modal con instrucciones para obtener el token -->
+<div id="help-token-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-lg shadow-lg max-w-lg w-full p-6">
+        <h2 class="text-xl font-bold text-blue-900 mb-4">¿Cómo obtener el token de GitHub?</h2>
+        <ol class="list-decimal list-inside space-y-2 text-gray-700">
+            <li>Inicia sesión en <a href="https://github.com" target="_blank" class="text-blue-700 underline">GitHub</a>.
+            </li>
+            <li>Ve a <strong>Settings</strong> &gt; <strong>Developer settings</strong> &gt; <strong>Personal access
+                tokens</strong>.
+            </li>
+            <li>Haz clic en <strong>Generate new token</strong>.</li>
+            <li>Selecciona los permisos necesarios: <code>read:org</code>, <code>repo</code>, <code>read:user</code>.
+            </li>
+            <li>Haz clic en <strong>Generate token</strong> y copia el token generado.</li>
+        </ol>
+        <p class="mt-4 text-sm text-gray-500">Nota: Guarda el token en un lugar seguro. No podrás verlo nuevamente
+            después de cerrar la página.</p>
+        <div class="mt-6 flex justify-end">
+            <button id="close-help-token"
+                    class="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition">Cerrar
+            </button>
+        </div>
+    </div>
+</div>
 
-                    <footer class="mt-auto text-center text-sm text-gray-400 py-4 bg-white bg-opacity-80 shadow-inner w-full">
-                        GitHub Classroom Helper &middot; 2025 – v1.0
-                    </footer>
+<div class="flex h-screen">
+
+    <!-- Barra lateral de navegación -->
+    <nav id="sidebar"
+         class="bg-white shadow w-64 flex flex-col fixed inset-y-0 z-20 transform -translate-x-full transition-transform duration-300 lg:translate-x-0">
+        <div class="px-6 py-4">
+            <span class="font-bold text-blue-900 text-xl">GitHub Classroom Helper</span>
+        </div>
+        <div class="flex-1 px-4 space-y-2">
+            <!-- Botón para la vista de creación de assignments -->
+            <button id="nav-create"
+                    class="nav-btn w-full text-left font-semibold text-blue-700 hover:text-blue-900 px-4 py-2 rounded-lg hover:bg-blue-100"
+                    aria-current="page" type="button">Crear Assignments
+            </button>
+            <!-- Botón para la vista de notas y entregas -->
+            <button id="nav-deliveries"
+                    class="nav-btn w-full text-left font-semibold text-blue-700 hover:text-blue-900 px-4 py-2 rounded-lg hover:bg-blue-100"
+                    type="button">Ver Notas y Entregas
+            </button>
+            <!-- Botón para la vista de resumen de entregas -->
+            <button id="nav-deliveries-summary"
+                    class="nav-btn w-full text-left font-semibold text-blue-700 hover:text-blue-900 px-4 py-2 rounded-lg hover:bg-blue-100"
+                    type="button">Resumen de Entregas
+            </button>
+        </div>
+    </nav>
+
+    <!-- Contenido principal -->
+    <div class="flex-1 flex flex-col">
+
+        <!-- Encabezado para dispositivos móviles -->
+        <header class="bg-white shadow sticky top-0 z-10 w-full flex items-center justify-between px-4 py-3 lg:hidden">
+            <span class="font-bold text-blue-900 text-xl">GitHub Classroom Helper</span>
+            <!-- Botón para alternar la visibilidad de la barra lateral -->
+            <button id="menu-toggle" class="text-blue-700 hover:text-blue-900 focus:outline-none">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
+                </svg>
+            </button>
+        </header>
+
+        <!-- Contenedor de vistas SPA -->
+        <main id="spa-views" class="flex-1 flex flex-col items-center py-6 w-full">
+            <div class="w-full max-w-3xl flex-1 flex flex-col">
+                <!-- Vista para crear assignments -->
+                <section id="view-assignments" class="space-y-8 w-full flex-1"></section>
+                <!-- Vista para ver notas -->
+                <section id="view-grades" class="space-y-8 w-full flex-1 hidden"></section>
+                <!-- Vista para el resumen de entregas -->
+                <section id="view-deliveries-summary" class="hidden space-y-8 py-8"></section>
+            </div>
+            <!-- Spinner superpuesto para indicar carga -->
+            <div id="spinner-overlay"
+                 class="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50 z-50 hidden">
+                <div class="loader">
+                    <div class="h-8 w-8 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
                 </div>
             </div>
-            <script src="js/view-deliveri-summary.js"></script>
-            <script src="js/view-grades.js"></script>
-            <script src="js/create-assignments.js"></script>
-            <script>
-                // SPA Navigation logic
-                function switchView(view) {
-                    document.getElementById("view-assignments").classList.toggle("hidden", view !== "assignments");
-                    document.getElementById("view-grades").classList.toggle("hidden", view !== "grades");
-                    document.getElementById("view-deliveries-summary").classList.toggle("hidden", view !== "deliveries-summary");
-                    document.getElementById("nav-create").setAttribute("aria-current", view === "assignments" ? "page" : "");
-                    document.getElementById("nav-deliveries").setAttribute("aria-current", view === "grades" ? "page" : "");
-                    document.getElementById("nav-deliveries-summary").setAttribute("aria-current", view === "deliveries-summary" ? "page" : "");
-                }
-                document.getElementById("nav-create").onclick = () => switchView("assignments");
-                document.getElementById("nav-deliveries").onclick = () => switchView("grades");
-                document.getElementById("nav-deliveries-summary").onclick = () => switchView("deliveries-summary");
+        </main>
 
-                // Inicializar ambas vistas
-                window.addEventListener("DOMContentLoaded", () => {
-                    renderCreateAssignmentsView(document.getElementById("view-assignments"));
-                    renderViewGrades(document.getElementById("view-grades"));
-                    renderViewDeliveriesSummary(document.getElementById("view-deliveries-summary"));
-                });
+        <!-- Pie de página -->
+        <footer class="mt-auto text-center text-sm text-gray-400 py-4 bg-white bg-opacity-80 shadow-inner w-full">
+            GitHub Classroom Helper &middot; 2025 – v1.0
+        </footer>
 
-                // Sidebar toggle for mobile
-                const sidebar = document.getElementById("sidebar");
-                const menuToggle = document.getElementById("menu-toggle");
-                menuToggle.addEventListener("click", () => {
-                    sidebar.classList.toggle("-translate-x-full");
-                });
+    </div>
+</div>
 
-                function showSpinner() {
-                    document.getElementById('spinner-overlay').classList.remove('hidden');
-                }
-
-                function hideSpinner() {
-                    document.getElementById('spinner-overlay').classList.add('hidden');
-                }
-            </script>
-            </body>
-            </html>
+<!-- Scripts para las vistas y funcionalidades -->
+<script src="js/view-deliveri-summary.js"></script>
+<script src="js/view-grades.js"></script>
+<script src="js/create-assignments.js"></script>
+<script src="js/navigation-spa.js"></script>
+<script src="js/spinner.js"></script>
+<script src="js/token-modal.js"></script>
+</body>
+</html>

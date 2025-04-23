@@ -1,6 +1,10 @@
-// js/create-assignments.js
-
+/**
+ * Renderiza la vista para crear assignments en el contenedor proporcionado.
+ *
+ * @param {HTMLElement} container - El elemento HTML donde se renderizará la vista.
+ */
 function renderCreateAssignmentsView(container) {
+    // Renderiza el formulario principal y la estructura de la vista
     container.innerHTML = `
     <div class="bg-white shadow rounded-2xl p-7">
       <h2 class="text-2xl font-extrabold mb-2 text-blue-900 text-center">🚀 Crear Assignments</h2>
@@ -47,6 +51,7 @@ function renderCreateAssignmentsView(container) {
     </div>
   `;
 
+    // Referencias a los elementos del DOM
     const caToken = container.querySelector('#ca-token');
     const caOrg = container.querySelector('#ca-org');
     const caClassroom = container.querySelector('#ca-classroom');
@@ -62,6 +67,7 @@ function renderCreateAssignmentsView(container) {
     let caTemplatesFull = [], caTemplatesFiltered = [], caCurrentPage = 1;
     const PAGE_SZ = 10;
 
+    // Evento para cargar organizaciones al cambiar el token
     caToken.addEventListener('change', async () => {
         caError.textContent = "";
         caOrg.innerHTML = `<option disabled selected value="">Cargando...</option>`;
@@ -69,18 +75,19 @@ function renderCreateAssignmentsView(container) {
             const resp = await fetch(`https://api.github.com/user/orgs`, {
                 headers: { "Authorization": `Bearer ${caToken.value.trim()}` }
             });
-            if(!resp.ok) throw new Error("Token inválido");
+            if (!resp.ok) throw new Error("Token inválido");
             const data = await resp.json();
             caOrg.innerHTML = `<option disabled selected value="">--- Seleccione organización ---</option>`;
             data.forEach(org => {
                 caOrg.innerHTML += `<option value="${org.login}">${org.login}</option>`;
             });
-        } catch(e) {
+        } catch (e) {
             caOrg.innerHTML = `<option disabled selected value="">Error</option>`;
             caError.textContent = e.message;
         }
     });
 
+    // Evento para cargar classrooms al cambiar la organización
     caOrg.addEventListener('change', async () => {
         caClassroom.innerHTML = `<option disabled selected value="">Cargando classrooms...</option>`;
         try {
@@ -94,60 +101,68 @@ function renderCreateAssignmentsView(container) {
             const classes = await resp.json();
             caClassroom.innerHTML = `<option disabled selected value="">--- Seleccione classroom ---</option>`;
             classes.filter(c => c.name?.includes(caOrg.value)).forEach(cls => {
-                // Usamos slug en value
                 let slug = cls.url.split("/classrooms/")[1];
                 caClassroom.innerHTML += `<option value="${slug}">${cls.name}</option>`;
             });
-        } catch(e) {
+        } catch (e) {
             caClassroom.innerHTML = `<option disabled selected value="">Error</option>`;
             caError.textContent = e.message;
         }
     });
 
+    // Evento para manejar el envío del formulario
     caForm.onsubmit = async (e) => {
         e.preventDefault();
         caError.textContent = "";
         const org = caOrg.value, prefix = caPrefix.value, slug = caClassroom.value, token = caToken.value.trim();
-        if(!org || !prefix || !slug || !token) { caError.textContent = "Completa todos los campos"; return; }
+        if (!org || !prefix || !slug || !token) {
+            caError.textContent = "Completa todos los campos";
+            return;
+        }
         caTemplatesSection.classList.remove("hidden");
         caTemplateList.innerHTML = `<div class="py-4 text-blue-700">⏳ Buscando templates...</div>`;
         let templates = [];
         try {
             let page = 1, more = true;
-            while(more) {
+            while (more) {
                 const url = `https://api.github.com/orgs/${org}/repos?type=private&per_page=100&page=${page}`;
-                const res = await fetch(url, { headers: {"Authorization": `Bearer ${token}` } });
+                const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
                 const data = await res.json();
-                if(data.length===0) break;
-                templates.push(...(data.filter(r=>r.is_template)));
-                more = data.length === 100; page++;
+                if (data.length === 0) break;
+                templates.push(...(data.filter(r => r.is_template)));
+                more = data.length === 100;
+                page++;
             }
-            if(prefix !== "ALL") templates = templates.filter(t=>t.name.startsWith(prefix));
-            caTemplatesFull = templates; caCurrentPage = 1; updateTemplateTable();
-        } catch(e) {
+            if (prefix !== "ALL") templates = templates.filter(t => t.name.startsWith(prefix));
+            caTemplatesFull = templates;
+            caCurrentPage = 1;
+            updateTemplateTable();
+        } catch (e) {
             caError.textContent = e.message;
             caTemplatesSection.classList.add("hidden");
         }
     };
 
+    // Actualiza la tabla de templates
     function updateTemplateTable() {
         caTemplateList.innerHTML = "";
         const filterText = caFilter.value?.toLowerCase() || "";
         caTemplatesFiltered = caTemplatesFull.filter(t => t.name.toLowerCase().includes(filterText));
-        const totalPages = Math.max(1, Math.ceil(caTemplatesFiltered.length/PAGE_SZ));
-        if(caCurrentPage > totalPages) caCurrentPage = totalPages;
-        const start = (caCurrentPage-1)*PAGE_SZ, end = start+PAGE_SZ;
-        if(caTemplatesFiltered.length===0) {
+        const totalPages = Math.max(1, Math.ceil(caTemplatesFiltered.length / PAGE_SZ));
+        if (caCurrentPage > totalPages) caCurrentPage = totalPages;
+        const start = (caCurrentPage - 1) * PAGE_SZ, end = start + PAGE_SZ;
+        if (caTemplatesFiltered.length === 0) {
             caTemplateList.innerHTML = `<div class="text-red-600 font-medium">No hay templates.</div>`;
-            caPrev.disabled = caNext.disabled = true; caPageinfo.textContent = "";
+            caPrev.disabled = caNext.disabled = true;
+            caPageinfo.textContent = "";
             return;
         }
-        caTemplatesFiltered.slice(start,end).forEach(tpl => {
+        caTemplatesFiltered.slice(start, end).forEach(tpl => {
             caTemplateList.innerHTML += `
         <div class="p-4 rounded-xl bg-gray-100 shadow flex items-center justify-between gap-4">
           <div>
             <div class="font-bold text-blue-800">${tpl.name}</div>
-            <div class="text-gray-500 text-xs">${tpl.description||""}</div>
+            <div class="text-gray-500 text-xs">${tpl.description || ""}</div>
           </div>
           <button
             class="create-btn bg-green-600 text-white px-4 py-1.5 rounded font-semibold shadow hover:bg-green-800 transition"
@@ -168,7 +183,9 @@ function renderCreateAssignmentsView(container) {
             };
         });
     }
-    caFilter.oninput = () => { caCurrentPage=1; updateTemplateTable(); };
-    caPrev.onclick = () => { if(caCurrentPage>1){caCurrentPage--;updateTemplateTable();} };
-    caNext.onclick = () => { const tpages=Math.ceil(caTemplatesFiltered.length/PAGE_SZ); if(caCurrentPage<tpages){caCurrentPage++;updateTemplateTable();} };
+
+    // Eventos para la paginación y filtrado
+    caFilter.oninput = () => { caCurrentPage = 1; updateTemplateTable(); };
+    caPrev.onclick = () => { if (caCurrentPage > 1) { caCurrentPage--; updateTemplateTable(); } };
+    caNext.onclick = () => { const tpages = Math.ceil(caTemplatesFiltered.length / PAGE_SZ); if (caCurrentPage < tpages) { caCurrentPage++; updateTemplateTable(); } };
 }
