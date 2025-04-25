@@ -27,38 +27,6 @@
 </head>
 <body class="flex flex-col min-h-screen bg-gradient-to-br from-sky-100 via-blue-200 to-blue-400">
 
-<!-- Botón para abrir el modal de ayuda para obtener el token -->
-<div class="fixed top-4 right-4 z-50">
-    <button id="help-token-btn"
-            class="bg-gradient-to-r from-blue-500 to-blue-700 text-white px-6 py-3 rounded-full shadow-lg hover:from-blue-600 hover:to-blue-800 transition transform hover:scale-105">
-        ¿Cómo obtener el token?
-    </button>
-</div>
-
-<!-- Modal con instrucciones para obtener el token -->
-<div id="help-token-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center hidden z-50">
-    <div class="bg-white rounded-lg shadow-lg max-w-lg w-full p-6">
-        <h2 class="text-xl font-bold text-blue-900 mb-4">¿Cómo obtener el token de GitHub?</h2>
-        <ol class="list-decimal list-inside space-y-2 text-gray-700">
-            <li>Inicia sesión en <a href="https://github.com" target="_blank" class="text-blue-700 underline">GitHub</a>.
-            </li>
-            <li>Ve a <strong>Settings</strong> &gt; <strong>Developer settings</strong> &gt; <strong>Personal access
-                tokens</strong>.
-            </li>
-            <li>Haz clic en <strong>Generate new token</strong>.</li>
-            <li>Selecciona los permisos necesarios: <code>read:org</code>, <code>repo</code>, <code>read:user</code>.
-            </li>
-            <li>Haz clic en <strong>Generate token</strong> y copia el token generado.</li>
-        </ol>
-        <p class="mt-4 text-sm text-gray-500">Nota: Guarda el token en un lugar seguro. No podrás verlo nuevamente
-            después de cerrar la página.</p>
-        <div class="mt-6 flex justify-end">
-            <button id="close-help-token"
-                    class="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition">Cerrar
-            </button>
-        </div>
-    </div>
-</div>
 
 <div class="flex h-screen">
 
