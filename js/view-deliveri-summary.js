@@ -30,6 +30,8 @@ function renderViewDeliveriesSummary(container) {
     const summaryForm = container.querySelector("#summary-form");
     const summaryResults = container.querySelector("#summary-results");
     const summaryError = container.querySelector("#summary-error");
+    let assignments = [];
+    let allGrades = [];
 
     // --- Carga de classrooms al cambiar el token ---
     summaryToken.addEventListener("change", async () => {
@@ -81,10 +83,10 @@ function renderViewDeliveriesSummary(container) {
             showSpinner();
 
             // 1. Cargar assignments
-            const assignments = await getAssignments(classroomId, token);
+            assignments = await getAssignments(classroomId, token);
 
             // 2. Cargar calificaciones
-            const allGrades = await getAllGrades(assignments, token);
+            allGrades = await getAllGrades(assignments, token);
             hideSpinner();
 
             // 3. Procesar resultados
@@ -164,7 +166,7 @@ function renderViewDeliveriesSummary(container) {
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
                 <span><strong>Total de Assignments:</strong> ${totalAssignments}</span>
                 <button id="download-csv" class="bg-green-50 text-green-800 border border-green-400 px-3 py-1 rounded-md text-xs hover:bg-green-100 focus:ring-2 focus:ring-green-200">
-                    📥 Descargar CSV
+                    📥 Descargar Excel
                 </button>
             </div>
             <div>
@@ -205,8 +207,7 @@ function renderViewDeliveriesSummary(container) {
                 renderTablePager();
             }
         });
-        downloadCsvBtn.addEventListener("click", () => downloadCSV(studentsSummary, totalAssignments));
-
+        downloadCsvBtn.addEventListener("click", () => downloadCSV(studentsSummary, totalAssignments, assignments, allGrades));
         // --- Tabla + controles (renderizado) ---
         function filterSortPaginate() {
             // Filtrar
@@ -323,27 +324,98 @@ function renderViewDeliveriesSummary(container) {
     }
 
     // --- Descarga CSV (simple, clean) ---
-    function downloadCSV(studentsSummary, totalAssignments) {
-        const csvRows = [["Usuario", "Email", "Entregas", "% Entregadas", "Nota Promedio"]];
+    function downloadCSV(studentsSummary, totalAssignments, assignments, allGrades) {
+        // Crear contenido para la hoja "Resumen"
+        let summarySheet = `
+        <Worksheet ss:Name="Resumen">
+            <Table>
+                <Row>
+                    <Cell><Data ss:Type="String">Usuario</Data></Cell>
+                    <Cell><Data ss:Type="String">Email</Data></Cell>
+                    <Cell><Data ss:Type="String">Entregas</Data></Cell>
+                    <Cell><Data ss:Type="String">% Entregadas</Data></Cell>
+                    <Cell><Data ss:Type="String">Nota Promedio</Data></Cell>
+                </Row>
+    `;
         Object.entries(studentsSummary).forEach(([user, data]) => {
             const avgNota = data.notaCount > 0 ? Math.ceil((data.notaTotal / data.notaCount) / 10) : 0;
             const porcentaje = totalAssignments > 0 ? (data.entregas / totalAssignments * 100).toFixed(1) : '0.0';
-            csvRows.push([user, data.email || '-', data.entregas, `${porcentaje}%`, avgNota]);
+            summarySheet += `
+            <Row>
+                <Cell><Data ss:Type="String">${user}</Data></Cell>
+                <Cell><Data ss:Type="String">${data.email || '-'}</Data></Cell>
+<Cell><Data ss:Type="String">${data.entregas}/${totalAssignments}</Data></Cell>                <Cell><Data ss:Type="String">${porcentaje}%</Data></Cell>
+                <Cell><Data ss:Type="Number">${avgNota}</Data></Cell>
+            </Row>
+        `;
         });
-        const csvContent = csvRows.map(row =>
-            row.map(val => `"${`${val}`.replace(/"/g, '""')}"`).join(',')
-        ).join('\n');
-        const blob = new Blob([csvContent], {type: "text/csv"});
+        summarySheet += `</Table></Worksheet>`;
+
+        // Crear contenido para la hoja "Detalle"
+        let detailSheet = `
+        <Worksheet ss:Name="Detalle">
+            <Table>
+                <Row>
+                    <Cell><Data ss:Type="String">Usuario</Data></Cell>
+                    <Cell><Data ss:Type="String">Email</Data></Cell>
+                    <Cell><Data ss:Type="String">Tarea</Data></Cell>
+                    <Cell><Data ss:Type="String">Nota Obtenida</Data></Cell>
+                    <Cell><Data ss:Type="String">Fecha Último Commit</Data></Cell>
+                </Row>
+    `;
+        assignments.forEach((assignment, index) => {
+            const grades = allGrades[index];
+            grades.forEach(student => {
+                const username = student.github_username;
+                const email = student.roster_identifier || '-';
+                const nota = student.points_awarded !== null ? student.points_awarded : 'Sin Nota';
+                const fechaCommit = student.submission_timestamp || 'Sin Entrega';
+                const assignmentName = student.assignment_name || 'Sin Nombre';
+                detailSheet += `
+                <Row>
+                    <Cell><Data ss:Type="String">${username}</Data></Cell>
+                    <Cell><Data ss:Type="String">${email}</Data></Cell>
+                    <Cell><Data ss:Type="String">${assignmentName}</Data></Cell>
+                    <Cell><Data ss:Type="String">${nota}</Data></Cell>
+                    <Cell><Data ss:Type="String">${fechaCommit}</Data></Cell>
+                </Row>
+            `;
+            });
+        });
+        detailSheet += `</Table></Worksheet>`;
+
+        // Crear el archivo XML completo
+        const excelContent = `
+        <xml version="1.0"?>
+        <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+                  xmlns:o="urn:schemas-microsoft-com:office:office"
+                  xmlns:x="urn:schemas-microsoft-com:office:excel"
+                  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+            <Styles>
+                <Style ss:ID="Default" ss:Name="Normal">
+                    <Alignment ss:Vertical="Bottom"/>
+                    <Borders/>
+                    <Font/>
+                    <Interior/>
+                    <NumberFormat/>
+                    <Protection/>
+                </Style>
+            </Styles>
+            ${summarySheet}
+            ${detailSheet}
+        </Workbook>
+    `;
+
+        // Crear y descargar el archivo
+        const blob = new Blob([excelContent], {type: "application/vnd.ms-excel"});
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.style.display = 'none';
         a.href = url;
-        a.download = "resumen_notas.csv";
+        a.download = "resumen_notas.xls";
         document.body.appendChild(a);
         a.click();
         setTimeout(() => {
             URL.revokeObjectURL(url);
             a.remove();
         }, 500);
-    }
-}
+    }}
