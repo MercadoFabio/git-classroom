@@ -1,14 +1,14 @@
 /**
  * Renderiza la vista de resumen de entregas en el contenedor proporcionado.
+ * Utiliza el token guardado en sessionStorage.
  * @param {HTMLElement} container - Contenedor donde se renderizará la vista.
  */
 function renderViewDeliveriesSummary(container) {
-    // --- Plantilla principal con estilos v2.0 ---
+    // --- Plantilla principal sin el input de token ---
     container.innerHTML = `
         <div class="glass-panel rounded-xl p-6 md:p-8 w-full">
             <h2 class="text-2xl md:text-3xl font-bold mb-6 text-cyan-300 text-center tracking-wider">Resumen de Notas</h2>
             <form id="summary-form" class="space-y-5">
-             ${renderTokenInput({inputId: "summary-token", btnId: "help-token-btn-summary"})} 
                 <div>
                     <label class="block text-sm font-semibold text-cyan-200 mb-2">Classroom:</label>
                     <select id="summary-classroom" class="glass-panel w-full px-3 py-2.5 rounded-md border border-cyan-400/20 focus:ring-2 focus:ring-cyan-400 focus:outline-none placeholder-slate-500" required>
@@ -22,10 +22,8 @@ function renderViewDeliveriesSummary(container) {
         </div>
     `;
 
-    setupHelpTokenModal("help-token-btn-summary");
 
-    // -- Referencias (sin cambios en la lógica) --
-    const summaryToken = container.querySelector("#summary-token");
+    // -- Referencias (se elimina summaryToken) --
     const summaryClassroom = container.querySelector("#summary-classroom");
     const summaryForm = container.querySelector("#summary-form");
     const summaryResults = container.querySelector("#summary-results");
@@ -34,15 +32,17 @@ function renderViewDeliveriesSummary(container) {
     let allGrades = [];
     let studentsSummary = {};
 
-    // --- Lógica de carga y fetch (sin cambios) ---
-    summaryToken.addEventListener("change", async () => {
-        await loadClassrooms(summaryToken.value.trim());
-    });
+    // --- Lógica de carga y fetch ---
+    
+    // Cargar los classrooms la primera vez que el usuario interactúa con el select
+    summaryClassroom.addEventListener("focus", loadClassrooms, { once: true });
 
-     async function loadClassrooms(token) {
+    async function loadClassrooms() {
+        const token = getToken();
+        if (!token) return;
+
         summaryClassroom.innerHTML = `<option disabled selected value="">Cargando classrooms...</option>`;
         summaryError.textContent = "";
-        if (!token) return;
         try {
             showSpinner();
             const res = await fetch('https://api.github.com/classrooms', {
@@ -70,10 +70,11 @@ function renderViewDeliveriesSummary(container) {
         ev.preventDefault();
         summaryResults.innerHTML = '';
         summaryError.textContent = '';
+        
+        const token = getToken();
+        if (!token) return;
 
         const classroomId = summaryClassroom.value;
-        const token = summaryToken.value.trim();
-
         if (!classroomId) {
             summaryError.textContent = 'Por favor selecciona un classroom.';
             return;
@@ -111,6 +112,7 @@ function renderViewDeliveriesSummary(container) {
         );
         return Promise.all(gradePromises);
     }
+    
 
     function buildStudentSummary(allGrades) {
         const summary = {};
@@ -130,7 +132,6 @@ function renderViewDeliveriesSummary(container) {
         return summary;
     }
 
-    // --- Render del resumen, tabla y controles con estilos v2.0 ---
     function renderSummaryTable(totalAssignments, studentsSummary) {
         let pageSize = 10;
         let currentPage = 1;
@@ -244,19 +245,15 @@ function renderViewDeliveriesSummary(container) {
         renderTablePager();
     }
 
-    // --- Descarga Excel (sin cambios en la lógica, solo en la presentación) ---
     function downloadExcelWithXLSX(studentsSummary, totalAssignments, assignments, allGrades) {
-        // ... La lógica interna de esta función no necesita cambios visuales y puede permanecer igual.
         const summaryData = [["Usuario", "Email", "Entregas", "% Entregadas", "Nota Promedio"]];
         Object.entries(studentsSummary).forEach(([user, data]) => {
             const avgNota = data.notaCount > 0 ? Math.ceil((data.notaTotal / data.notaCount) / 10) : 0;
             const porcentaje = totalAssignments > 0 ? (data.entregas / totalAssignments * 100).toFixed(1) : '0.0';
             summaryData.push([user, data.email || '-', `${data.entregas}/${totalAssignments}`, `${porcentaje}%`, avgNota]);
         });
-
         const detailData = [["Usuario", "Email", "Tarea", "Nota Obtenida", "Fecha Último Commit", "Fecha Límite", "Estado Entrega"]];
         const dateOptions = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' };
-
         assignments.forEach((assignment, index) => {
             const grades = allGrades[index];
             grades.forEach(student => {
@@ -264,10 +261,8 @@ function renderViewDeliveriesSummary(container) {
                 const email = student.roster_identifier || '-';
                 const nota = student.points_awarded !== null ? student.points_awarded : 'Sin Nota';
                 const assignmentName = student.assignment_name || 'Sin Nombre';
-
                 const fechaCommit = student.submission_timestamp ? new Date(student.submission_timestamp).toLocaleString('es-AR', dateOptions) : 'Sin Entrega';
                 const fechaLimite = assignment.deadline ? new Date(assignment.deadline).toLocaleString('es-AR', dateOptions) : 'Sin Fecha Límite';
-
                 let estadoEntrega = 'Sin Entrega';
                 if (student.submission_timestamp) {
                     if (assignment.deadline) {
@@ -276,20 +271,15 @@ function renderViewDeliveriesSummary(container) {
                         estadoEntrega = 'Entregado';
                     }
                 }
-                
                 detailData.push([username, email, assignmentName, nota, fechaCommit, fechaLimite, estadoEntrega]);
             });
         });
-
         const workbook = XLSX.utils.book_new();
         const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
         const detailSheet = XLSX.utils.aoa_to_sheet(detailData);
-
         detailSheet['!cols'] = [ { wch: 20 }, { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 15 } ];
-
         XLSX.utils.book_append_sheet(workbook, summarySheet, "Resumen");
         XLSX.utils.book_append_sheet(workbook, detailSheet, "Detalle");
-
         XLSX.writeFile(workbook, "resumen_notas_detallado_v2.xlsx");
     }
 }

@@ -1,14 +1,14 @@
 /**
  * Renderiza el formulario y gestión de creación de assignments. (Estilo v2.0 Futurist)
+ * Utiliza el token guardado en sessionStorage.
  * @param {HTMLElement} container - Contenedor donde renderizar la vista.
  */
 function renderCreateAssignmentsView(container) {
-    // -- Render principal con estilos v2.0 ---
+    // -- Render principal sin el input de token ---
     container.innerHTML = `
     <div class="glass-panel rounded-xl p-6 md:p-8 w-full">
         <h2 class="text-2xl md:text-3xl font-bold mb-6 text-cyan-300 text-center tracking-wider">🚀 Crear Assignments</h2>
         <form id="ca-form" class="space-y-5">
-            ${renderTokenInput({inputId: "ca-token", btnId: "help-token-btn-create"})}
             <div>
                 <label class="block text-sm font-semibold text-cyan-200 mb-2">Organización:</label>
                 <select id="ca-org" class="glass-panel w-full px-3 py-2.5 rounded-md border border-cyan-400/20 focus:ring-2 focus:ring-cyan-400 focus:outline-none" required>
@@ -47,14 +47,14 @@ function renderCreateAssignmentsView(container) {
         </div>
     </div>
     `;
-    setupHelpTokenModal("help-token-btn-create");
+
+    // setupHelpTokenModal ya no es necesario aquí, podría estar en un menú de usuario o en el pie de página.
 
     // -- Constantes / helpers (sin cambios) --
     const PAGE_SIZE = 10;
 
-    // -- Referencias DOM (sin cambios) --
+    // -- Referencias DOM (se elimina caToken) --
     const $ = sel => container.querySelector(sel);
-    const caToken = $("#ca-token");
     const caOrg = $("#ca-org");
     const caClassroom = $("#ca-classroom");
     const caPrefix = $("#ca-prefix");
@@ -72,25 +72,121 @@ function renderCreateAssignmentsView(container) {
     let filteredTemplates = [];
     let currentPage = 1;
 
-    // -- Lógica de Eventos y Fetch (sin cambios) --
-    caToken.addEventListener('change', loadOrganizations);
+    // -- Eventos principales --
+    
+    // El evento para cargar organizaciones ya no depende de un input de token.
+    // Se puede llamar al cargar la vista o dejar que se active al cambiar un select.
+    // Aquí, lo activaremos cuando el usuario interactúe con el select de organización.
+    caOrg.addEventListener('focus', loadOrganizations, { once: true }); // Se ejecuta solo la primera vez que se hace foco.
+
     caOrg.addEventListener('change', loadClassrooms);
     caFilter.addEventListener('input', () => { currentPage = 1; renderTemplates(); });
     caPrev.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderTemplates(); } });
     caNext.addEventListener('click', () => { if (currentPage < getTotalPages()) { currentPage++; renderTemplates(); } });
-    caForm.onsubmit = async (e) => { e.preventDefault(); caError.textContent = ""; if (!(caToken.value && caOrg.value && caClassroom.value && caPrefix.value)) { caError.textContent = "Completa todos los campos"; return; } await loadTemplates(); };
+    
+    caForm.onsubmit = async (e) => {
+        e.preventDefault();
+        caError.textContent = "";
+        if (!getOrg() || !getClassroom() || !getPrefix()) {
+            caError.textContent = "Completa todos los campos";
+            return;
+        }
+        await loadTemplates();
+    };
 
-    function getToken() { return caToken.value.trim(); }
     function getOrg() { return caOrg.value; }
     function getPrefix() { return caPrefix.value; }
     function getClassroom() { return caClassroom.value; }
 
-    async function loadOrganizations() { caError.textContent = ""; caOrg.innerHTML = `<option disabled selected value="">Cargando...</option>`; showSpinner(); try { const resp = await fetch(`https://api.github.com/user/orgs`, { headers: { "Authorization": `Bearer ${getToken()}` } }); hideSpinner(); if (!resp.ok) throw new Error("Token inválido"); const orgs = await resp.json(); caOrg.innerHTML = `<option disabled selected value="">--- Seleccione organización ---</option>`; orgs.forEach(org => caOrg.innerHTML += `<option value="${org.login}">${org.login}</option>`); } catch (e) { hideSpinner(); caOrg.innerHTML = `<option disabled selected value="">Error</option>`; caError.textContent = e.message; } }
-    async function loadClassrooms() { caClassroom.innerHTML = `<option disabled selected value="">Cargando...</option>`; caError.textContent = ""; showSpinner(); try { const resp = await fetch('https://api.github.com/classrooms', { headers: { "Authorization": `Bearer ${getToken()}`, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" } }); hideSpinner(); if (!resp.ok) throw new Error("Error obteniendo classrooms."); const classes = await resp.json(); caClassroom.innerHTML = `<option disabled selected value="">--- Seleccione classroom ---</option>`; classes.filter(cl => cl.name?.includes(getOrg())).forEach(cl => { const slug = cl.url.split("/classrooms/")[1]; caClassroom.innerHTML += `<option value="${slug}">${cl.name}</option>`; }); } catch (e) { hideSpinner(); caClassroom.innerHTML = `<option disabled selected value="">Error</option>`; caError.textContent = e.message; } }
-    async function loadTemplates() { caTemplatesSection.classList.remove("hidden"); caTemplateList.innerHTML = `<div class="py-4 text-center text-cyan-300">⏳ Buscando plantillas de repositorio...</div>`; allTemplates = []; let page = 1, more = true; showSpinner(); try { while (more) { const url = `https://api.github.com/orgs/${getOrg()}/repos?type=private&per_page=100&page=${page}`; const res = await fetch(url, { headers: { "Authorization": `Bearer ${getToken()}` } }); const data = await res.json(); if (data.length === 0) break; allTemplates.push(...(data.filter(r => r.is_template))); more = data.length === 100; page++; } if (getPrefix() !== "ALL") allTemplates = allTemplates.filter(t => t.name.startsWith(getPrefix())); currentPage = 1; hideSpinner(); renderTemplates(); } catch (e) { hideSpinner(); caError.textContent = e.message; caTemplatesSection.classList.add("hidden"); } }
-    function getTotalPages() { return Math.max(1, Math.ceil(filteredTemplates.length / PAGE_SIZE)); }
+    async function loadOrganizations() {
+        const token = getToken();
+        if (!token) return; // Si no hay token, la función getToken ya se encargó de redirigir.
 
-    // -- Renderizado de tarjetas de plantilla con estilo v2.0 --
+        caError.textContent = "";
+        caOrg.innerHTML = `<option disabled selected value="">Cargando...</option>`;
+        showSpinner();
+        try {
+            const resp = await fetch(`https://api.github.com/user/orgs`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            hideSpinner();
+            if (!resp.ok) throw new Error("Token inválido o sin permisos para ver organizaciones.");
+            const orgs = await resp.json();
+            caOrg.innerHTML = `<option disabled selected value="">--- Seleccione organización ---</option>`;
+            orgs.forEach(org =>
+                caOrg.innerHTML += `<option value="${org.login}">${org.login}</option>`
+            );
+        } catch (e) {
+            hideSpinner();
+            caOrg.innerHTML = `<option disabled selected value="">Error al cargar</option>`;
+            caError.textContent = e.message;
+        }
+    }
+
+    async function loadClassrooms() {
+        const token = getToken();
+        if (!token) return;
+
+        caClassroom.innerHTML = `<option disabled selected value="">Cargando classrooms...</option>`;
+        caError.textContent = "";
+        showSpinner();
+        try {
+            const resp = await fetch('https://api.github.com/classrooms', {
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28"
+                }
+            });
+            hideSpinner();
+            if (!resp.ok) throw new Error("Error obteniendo classrooms.");
+            const classes = await resp.json();
+            caClassroom.innerHTML = `<option disabled selected value="">--- Seleccione classroom ---</option>`;
+            classes.filter(cl => cl.name?.includes(getOrg())).forEach(cl => {
+                const slug = cl.url.split("/classrooms/")[1];
+                caClassroom.innerHTML += `<option value="${slug}">${cl.name}</option>`;
+            });
+        } catch (e) {
+            hideSpinner();
+            caClassroom.innerHTML = `<option disabled selected value="">Error al cargar</option>`;
+            caError.textContent = e.message;
+        }
+    }
+
+    async function loadTemplates() {
+        const token = getToken();
+        if (!token) return;
+
+        caTemplatesSection.classList.remove("hidden");
+        caTemplateList.innerHTML = `<div class="py-4 text-center text-cyan-300">⏳ Buscando plantillas de repositorio...</div>`;
+        allTemplates = [];
+        let page = 1, more = true;
+        showSpinner();
+        try {
+            while (more) {
+                const url = `https://api.github.com/orgs/${getOrg()}/repos?type=private&per_page=100&page=${page}`;
+                const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
+                const data = await res.json();
+                if (data.length === 0) break;
+                allTemplates.push(...(data.filter(r => r.is_template)));
+                more = data.length === 100;
+                page++;
+            }
+            if (getPrefix() !== "ALL") {
+                allTemplates = allTemplates.filter(t => t.name.startsWith(getPrefix()));
+            }
+            currentPage = 1;
+            hideSpinner();
+            renderTemplates();
+        } catch (e) {
+            hideSpinner();
+            caError.textContent = e.message;
+            caTemplatesSection.classList.add("hidden");
+        }
+    }
+    
+    // --- Lógica de renderizado y paginación (sin cambios) ---
+    function getTotalPages() { return Math.max(1, Math.ceil(filteredTemplates.length / PAGE_SIZE)); }
     function renderTemplates() {
         const filter = caFilter.value?.toLowerCase() || "";
         filteredTemplates = allTemplates.filter(t => t.name.toLowerCase().includes(filter));
@@ -108,7 +204,6 @@ function renderCreateAssignmentsView(container) {
         const slice = filteredTemplates.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
         slice.forEach(tpl => {
-            // Se inyecta la tarjeta con los nuevos estilos
             caTemplateList.innerHTML += `
                 <div class="glass-panel p-4 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-slate-700/50 hover:bg-slate-800/50 transition-colors duration-200">
                     <div class="flex-1">
@@ -127,14 +222,12 @@ function renderCreateAssignmentsView(container) {
         caNext.disabled = currentPage >= totalPages;
         caPageinfo.textContent = `Página ${currentPage} de ${totalPages}`;
 
-        // La lógica del botón de crear no cambia, solo su apariencia
         caTemplateList.querySelectorAll('.create-btn').forEach(btn => {
             btn.onclick = () => {
                 const name = btn.getAttribute('data-assignment');
                 const classroomSlug = btn.getAttribute('data-classroom');
                 navigator.clipboard.writeText(name);
                 window.open(`https://classroom.github.com/classrooms/${classroomSlug}/new_assignments/new`, "_blank");
-                // Podríamos considerar un modal de notificación más moderno aquí en el futuro
                 alert(`¡Nombre de assignment copiado!\n\n"${name}"\n\nPega este nombre en el formulario de Classroom.`);
             };
         });

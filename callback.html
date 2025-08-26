@@ -28,7 +28,6 @@
             })
             .then(res => {
                 if (!res.ok) {
-                    // Si la respuesta de la función no es 2xx, la convertimos en un error
                     return res.json().then(errorData => {
                         throw new Error(errorData.error_description || 'Error en el servidor de autenticación');
                     });

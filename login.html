@@ -14,13 +14,13 @@
         </button>
     </div>
 
+    <script src="js/config.js"></script>
     <script>
         document.getElementById('login-btn').addEventListener('click', () => {
-            const client_id = 'Ov23liLC8NRT7Z3lutSa';
-            const redirect_uri = window.location.origin + '/callback.html'; // Asegúrate que esta URL esté en tu config de GitHub App
-            const scope = 'read:org repo user:email';
+            const client_id = GITHUB_CONFIG.CLIENT_ID;
+            const scope = GITHUB_CONFIG.SCOPE;
+            const redirect_uri = window.location.origin + '/callback.html';
             
-            // Redirigir al usuario a la página de autorización de GitHub
             window.location.href = `https://github.com/login/oauth/authorize?client_id=${client_id}&redirect_uri=${redirect_uri}&scope=${scope}`;
         });
     </script>

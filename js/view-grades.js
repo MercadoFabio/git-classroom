@@ -1,15 +1,14 @@
 /**
  * Renderiza la vista para mostrar las notas y entregas. (Estilo v2.0 Futurist)
+ * Utiliza el token guardado en sessionStorage.
  * @param {HTMLElement} container - El elemento HTML donde se renderizará la vista.
  */
 function renderViewGrades(container) {
     // Renderiza la plantilla HTML base con los nuevos estilos
     container.innerHTML = getGradesHTMLTemplate();
-    setupHelpTokenModal("help-token-btn-grades");
-
-    // --- Referencias DOM (sin cambios en la lógica) ---
+    
+    // --- Referencias DOM (se elimina gToken) ---
     const $ = sel => container.querySelector(sel);
-    const gToken = $("#g-token");
     const gClassroom = $("#g-classroom");
     const gAssignment = $("#g-assignment");
     const gStep1 = $("#gstep1-form");
@@ -24,10 +23,9 @@ function renderViewGrades(container) {
     const gNext = $("#g-next-page");
     const gPageInfo = $("#g-grades-page");
 
-    // --- Variables de estado (sin cambios en la lógica) ---
+    // --- Variables de estado ---
     const API_VERSION = "2022-11-28";
     const PAGE_SIZE = 10;
-    let apiToken = "";
     let assignmentsCache = [];
     let gradesAll = [];
     let gradesFiltered = [];
@@ -35,34 +33,127 @@ function renderViewGrades(container) {
     let currentSortColumn = "points_awarded";
     let isAscending = false;
 
-    // --- Lógica de eventos y fetch (sin cambios) ---
-    gToken.addEventListener("change", handleLoadClassrooms);
+    // --- Lógica de eventos y fetch ---
+    gClassroom.addEventListener("focus", handleLoadClassrooms, { once: true });
     gStep1.onsubmit = handleLoadAssignments;
     gStep2.onsubmit = handleLoadGrades;
     gGradeFilter.oninput = handleFilter;
     gPrev.onclick = () => changePage(-1);
     gNext.onclick = () => changePage(1);
 
-    async function handleLoadClassrooms() { apiToken = gToken.value.trim(); gClassroom.innerHTML = `<option disabled selected value="">Cargando...</option>`; gLoading.textContent = "Cargando classrooms..."; gError.textContent = ""; try { showSpinner(); const res = await fetch("https://api.github.com/classrooms", { headers: githubHeaders(apiToken) }); hideSpinner(); if (!res.ok) throw new Error("Token inválido o sin acceso."); const classrooms = await res.json(); gClassroom.innerHTML = `<option disabled selected value="">--- Selecciona un classroom ---</option>`; classrooms.forEach(cl => { gClassroom.innerHTML += `<option value="${cl.id}">${cl.name}</option>`; }); if (classrooms.length === 0) gError.textContent = "No se encontraron classrooms."; } catch (e) { gClassroom.innerHTML = `<option disabled selected value="">Error</option>`; gError.textContent = e.message; } finally { gLoading.textContent = ""; } }
-    async function handleLoadAssignments(ev) { ev.preventDefault(); gAssignment.innerHTML = `<option disabled selected value="">Cargando...</option>`; gError.textContent = ""; gLoading.textContent = "Cargando assignments..."; gGradesView.classList.add('hidden'); gStep2.classList.add('hidden'); try { const classId = gClassroom.value; if (!classId) throw new Error("Selecciona un classroom"); showSpinner(); const res = await fetch(`https://api.github.com/classrooms/${classId}/assignments`, { headers: githubHeaders(apiToken) }); hideSpinner(); if (!res.ok) throw new Error("No se pueden obtener assignments."); const assignments = await res.json(); assignmentsCache = assignments; gAssignment.innerHTML = `<option disabled selected value="">--- Selecciona un assignment ---</option>`; assignments.forEach(a => gAssignment.innerHTML += `<option value="${a.id}">${a.title}</option>`); if (assignments.length > 0) gStep2.classList.remove('hidden'); else gError.textContent = "Este classroom no tiene assignments."; } catch (e) { gError.textContent = e.message; } finally { gLoading.textContent = ""; } }
-    async function handleLoadGrades(ev) { ev.preventDefault(); gGradesView.classList.add('hidden'); gError.textContent = ''; gLoading.textContent = "Cargando notas..."; try { const assignmentId = gAssignment.value; if (!assignmentId) throw new Error("Selecciona un assignment"); const selectedAssignment = assignmentsCache.find(a => a.id == assignmentId); showSpinner(); const res = await fetch(`https://api.github.com/assignments/${assignmentId}/grades`, { headers: githubHeaders(apiToken) }); hideSpinner(); if (!res.ok) throw new Error("No se pueden obtener notas."); gradesAll = await res.json(); gradesAll.forEach(grade => { grade.deadline = selectedAssignment.deadline; }); gradesFiltered = gradesAll; currentPage = 1; sortGrades(); renderGradesTable(); gGradesView.classList.remove('hidden'); } catch (e) { gError.textContent = e.message; } finally { gLoading.textContent = ''; } }
-    function handleFilter() { const q = gGradeFilter.value.toLowerCase(); gradesFiltered = gradesAll.filter(g => (g.github_username + " " + (g.roster_identifier || "")).toLowerCase().includes(q)); currentPage = 1; renderGradesTable(); }
-    function changePage(delta) { currentPage += delta; renderGradesTable(); }
-    function githubHeaders(token) { return { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": API_VERSION }; }
+    async function handleLoadClassrooms() {
+        const token = getToken(); 
+        if (!token) return;
+
+        gClassroom.innerHTML = `<option disabled selected value="">Cargando...</option>`;
+        gLoading.textContent = "Cargando classrooms...";
+        gError.textContent = "";
+        try {
+            showSpinner();
+            const res = await fetch("https://api.github.com/classrooms", { headers: githubHeaders(token) });
+            hideSpinner();
+            if (!res.ok) throw new Error("Token inválido o sin acceso.");
+            const classrooms = await res.json();
+            gClassroom.innerHTML = `<option disabled selected value="">--- Selecciona un classroom ---</option>`;
+            classrooms.forEach(cl => { gClassroom.innerHTML += `<option value="${cl.id}">${cl.name}</option>`; });
+            if (classrooms.length === 0) gError.textContent = "No se encontraron classrooms.";
+        } catch (e) {
+            hideSpinner();
+            gClassroom.innerHTML = `<option disabled selected value="">Error</option>`;
+            gError.textContent = e.message;
+        } finally {
+            gLoading.textContent = "";
+        }
+    }
+
+    async function handleLoadAssignments(ev) {
+        ev.preventDefault();
+        const token = getToken();
+        if (!token) return;
+
+        gAssignment.innerHTML = `<option disabled selected value="">Cargando...</option>`;
+        gError.textContent = "";
+        gLoading.textContent = "Cargando assignments...";
+        gGradesView.classList.add('hidden');
+        gStep2.classList.add('hidden');
+        try {
+            const classId = gClassroom.value;
+            if (!classId) throw new Error("Selecciona un classroom");
+            showSpinner();
+            const res = await fetch(`https://api.github.com/classrooms/${classId}/assignments`, { headers: githubHeaders(token) });
+            hideSpinner();
+            if (!res.ok) throw new Error("No se pueden obtener assignments.");
+            const assignments = await res.json();
+            assignmentsCache = assignments;
+            gAssignment.innerHTML = `<option disabled selected value="">--- Selecciona un assignment ---</option>`;
+            assignments.forEach(a => gAssignment.innerHTML += `<option value="${a.id}">${a.title}</option>`);
+            if (assignments.length > 0) gStep2.classList.remove('hidden');
+            else gError.textContent = "Este classroom no tiene assignments.";
+        } catch (e) {
+            hideSpinner();
+            gError.textContent = e.message;
+        } finally {
+            gLoading.textContent = "";
+        }
+    }
+
+    async function handleLoadGrades(ev) {
+        ev.preventDefault();
+        const token = getToken();
+        if (!token) return;
+
+        gGradesView.classList.add('hidden');
+        gError.textContent = '';
+        gLoading.textContent = "Cargando notas...";
+        try {
+            const assignmentId = gAssignment.value;
+            if (!assignmentId) throw new Error("Selecciona un assignment");
+            const selectedAssignment = assignmentsCache.find(a => a.id == assignmentId);
+            showSpinner();
+            const res = await fetch(`https://api.github.com/assignments/${assignmentId}/grades`, { headers: githubHeaders(token) });
+            hideSpinner();
+            if (!res.ok) throw new Error("No se pueden obtener notas.");
+            gradesAll = await res.json();
+            gradesAll.forEach(grade => { grade.deadline = selectedAssignment.deadline; });
+            gradesFiltered = gradesAll;
+            currentPage = 1;
+            sortGrades();
+            renderGradesTable();
+            gGradesView.classList.remove('hidden');
+        } catch (e) {
+            hideSpinner();
+            gError.textContent = e.message;
+        } finally {
+            gLoading.textContent = '';
+        }
+    }
+
+    function handleFilter() {
+        const q = gGradeFilter.value.toLowerCase();
+        gradesFiltered = gradesAll.filter(g => (g.github_username + " " + (g.roster_identifier || "")).toLowerCase().includes(q));
+        currentPage = 1;
+        renderGradesTable();
+    }
+    
+    function changePage(delta) {
+        currentPage += delta;
+        renderGradesTable();
+    }
+
+    function githubHeaders(token) {
+        return { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": API_VERSION };
+    }
+
+ 
+
     function sortGrades() { gradesFiltered.sort((a, b) => { const valA = getSortValue(a, currentSortColumn); const valB = getSortValue(b, currentSortColumn); if (valA < valB) return isAscending ? -1 : 1; if (valA > valB) return isAscending ? 1 : -1; return 0; }); }
     function getSortValue(item, column) { if (column === "points_awarded") return item.points_awarded != null ? item.points_awarded / 10 : -1; if (column === "submission_timestamp") return item.submission_timestamp ? new Date(item.submission_timestamp) : new Date(0); return item[column] || ""; }
-
-    /**
-     * Renderiza la tabla de notas con el estilo v2.0
-     */
     function renderGradesTable() {
         const start = (currentPage - 1) * PAGE_SIZE;
         const end = start + PAGE_SIZE;
         const grades = gradesFiltered.slice(start, end);
-
         gGradesTbody.innerHTML = grades.map(renderGradeRow).join("") || `<tr><td colspan="6" class="text-center p-6 text-slate-400">No hay datos para mostrar.</td></tr>`;
         updatePagination();
-
         const headers = container.querySelectorAll("th[data-column]");
         updateSortIcons(headers);
         headers.forEach(header => {
@@ -75,24 +166,13 @@ function renderViewGrades(container) {
             };
         });
     }
-
-    /**
-     * Renderiza una fila de la tabla de notas con el estilo v2.0
-     */
     function renderGradeRow(grade) {
-        const repoLink = grade.student_repository_name ?
-            `<a href="${grade.student_repository_url}" target="_blank" class="font-semibold text-cyan-400 hover:underline hover:text-cyan-300">${grade.student_repository_name}</a>` : "N/A";
-
+        const repoLink = grade.student_repository_name ? `<a href="${grade.student_repository_url}" target="_blank" class="font-semibold text-cyan-400 hover:underline hover:text-cyan-300">${grade.student_repository_name}</a>` : "N/A";
         const fechaEntrega = grade.submission_timestamp;
         const fechaLimite = grade.deadline;
         let entregaTardia = false;
-        
-        if (fechaEntrega && fechaLimite) {
-            entregaTardia = new Date(fechaEntrega) > new Date(fechaLimite);
-        }
-
+        if (fechaEntrega && fechaLimite) { entregaTardia = new Date(fechaEntrega) > new Date(fechaLimite); }
         const fechaEntregaClass = entregaTardia ? 'text-red-400 font-semibold' : 'text-slate-300';
-
         return `
             <tr class="border-b border-slate-700/50 transition-colors duration-200 hover:bg-slate-800/50">
                 <td class="p-3 text-slate-300 font-medium">${grade.github_username}</td>
@@ -103,8 +183,6 @@ function renderViewGrades(container) {
                 <td class="p-3 text-center text-xl font-bold text-cyan-300">${formatGrade(grade.points_awarded)}</td>
             </tr>`;
     }
-
-    // --- Funciones de formato y paginación (con pequeñas mejoras) ---
     function formatDate(timestamp) { if (!timestamp) return "—"; const d = new Date(timestamp); return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`; }
     function formatGrade(points) { return points != null ? (points / 10).toFixed(1) : "—"; }
     function updatePagination() { const total = gradesFiltered.length; const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE)); gGradesCount.textContent = `Mostrando ${Math.min(PAGE_SIZE, gradesFiltered.slice((currentPage - 1) * PAGE_SIZE).length)} de ${total} registros`; gPageInfo.textContent = `Página ${currentPage} de ${totalPages}`; gPrev.disabled = currentPage <= 1; gNext.disabled = currentPage >= totalPages; }
@@ -122,7 +200,7 @@ function renderViewGrades(container) {
                 <div class="border border-slate-700/50 p-5 rounded-lg">
                     <h3 class="font-semibold text-lg text-slate-300 mb-4 border-b border-slate-700 pb-2">Paso 1: Seleccionar Classroom</h3>
                     <form id="gstep1-form" class="space-y-5">
-                        ${renderTokenInput({inputId: "g-token", btnId: "help-token-btn-grades"})}
+                        <!-- El input de token se ha eliminado -->
                         <div>
                             <label class="block text-sm font-semibold text-cyan-200 mb-2">Classroom:</label>
                             <select id="g-classroom" class="glass-panel w-full px-3 py-2.5 rounded-md border border-cyan-400/20 focus:ring-2 focus:ring-cyan-400 focus:outline-none" required>
