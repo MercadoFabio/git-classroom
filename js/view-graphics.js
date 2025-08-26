@@ -175,7 +175,7 @@
                 }
 
                 // --- Procesar resumen de alumnos ---
-                function buildStudentSummary(allGrades, totalAssignments) {
+                function buildStudentSummary(allGrades) {
                     const summary = {};
                     allGrades.forEach(grades => {
                         grades.forEach(student => {
@@ -188,8 +188,10 @@
                                     notaCount: 0
                                 };
                             }
-                            if (student.points_awarded !== null && !isNaN(student.points_awarded)) {
+                            if (student.submission_timestamp) {
                                 summary[username].entregas++;
+                            }
+                            if (student.points_awarded !== null && !isNaN(student.points_awarded)) {
                                 summary[username].notaTotal += Number(student.points_awarded);
                                 summary[username].notaCount++;
                             }

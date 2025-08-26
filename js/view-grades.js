@@ -9,25 +9,26 @@ function renderViewGrades(container) {
 
     // --- DOM references ---
     const $ = sel => container.querySelector(sel);
-    const gToken        = $("#g-token");
-    const gClassroom    = $("#g-classroom");
-    const gAssignment   = $("#g-assignment");
-    const gStep1        = $("#gstep1-form");
-    const gStep2        = $("#gstep2-form");
-    const gError        = $("#g-error");
-    const gLoading      = $("#g-loading");
-    const gGradesView   = $("#g-gradesview");
-    const gGradesTbody  = $("#g-grades-tbody");
-    const gGradeFilter  = $("#g-gradefilter");
-    const gGradesCount  = $("#g-grades-count");
-    const gPrev         = $("#g-prev-page");
-    const gNext         = $("#g-next-page");
-    const gPageInfo     = $("#g-grades-page");
+    const gToken = $("#g-token");
+    const gClassroom = $("#g-classroom");
+    const gAssignment = $("#g-assignment");
+    const gStep1 = $("#gstep1-form");
+    const gStep2 = $("#gstep2-form");
+    const gError = $("#g-error");
+    const gLoading = $("#g-loading");
+    const gGradesView = $("#g-gradesview");
+    const gGradesTbody = $("#g-grades-tbody");
+    const gGradeFilter = $("#g-gradefilter");
+    const gGradesCount = $("#g-grades-count");
+    const gPrev = $("#g-prev-page");
+    const gNext = $("#g-next-page");
+    const gPageInfo = $("#g-grades-page");
 
     // --- State variables ---
     const API_VERSION = "2022-11-28";
     const PAGE_SIZE = 10;
     let apiToken = "";
+    let assignmentsCache = []; // <<< 1. Guardar la info completa de los assignments
     let gradesAll = [];
     let gradesFiltered = [];
     let currentPage = 1;
@@ -92,6 +93,8 @@ function renderViewGrades(container) {
             if (!res.ok) throw new Error("No se pueden obtener assignments.");
 
             const assignments = await res.json();
+            assignmentsCache = assignments; // <<< 2. Almacenar los assignments en el caché
+            
             gAssignment.innerHTML = `<option disabled selected value="">--- Selecciona un assignment ---</option>`;
             assignments.forEach(a =>
                 gAssignment.innerHTML += `<option value="${a.id}">${a.title}</option>`
@@ -114,6 +117,10 @@ function renderViewGrades(container) {
         try {
             const assignmentId = gAssignment.value;
             if (!assignmentId) throw new Error("Selecciona un assignment");
+
+            // <<< 3. Recuperar el assignment seleccionado del caché
+            const selectedAssignment = assignmentsCache.find(a => a.id == assignmentId);
+            
             showSpinner();
             const res = await fetch(`https://api.github.com/assignments/${assignmentId}/grades`, {
                 headers: githubHeaders(apiToken)
@@ -122,6 +129,12 @@ function renderViewGrades(container) {
 
             if (!res.ok) throw new Error("No se pueden obtener notas.");
             gradesAll = await res.json();
+
+            // <<< 4. Añadir el deadline a cada objeto 'grade' para facilitar el renderizado
+            gradesAll.forEach(grade => {
+                grade.deadline = selectedAssignment.deadline;
+            });
+            console.log(gradesAll,"notas")
             gradesFiltered = gradesAll;
             currentPage = 1;
             sortGrades();
@@ -168,13 +181,12 @@ function renderViewGrades(container) {
     }
 
     function getSortValue(item, column) {
-        if (column === "points_awarded") return item.points_awarded / 10 || 0;
-        if (column === "submission_timestamp") return new Date(item.submission_timestamp || 0);
+        if (column === "points_awarded") return item.points_awarded != null ? item.points_awarded / 10 : -1; // -1 para no calificados
+        if (column === "submission_timestamp") return item.submission_timestamp ? new Date(item.submission_timestamp) : new Date(0); // 1970 para no entregados
         return item[column] || "";
     }
 
     function renderGradesTable() {
-        // Paginación
         const start = (currentPage - 1) * PAGE_SIZE;
         const end = start + PAGE_SIZE;
         const grades = gradesFiltered.slice(start, end);
@@ -182,7 +194,6 @@ function renderViewGrades(container) {
         gGradesTbody.innerHTML = grades.map(renderGradeRow).join("");
         updatePagination();
 
-        // Actualiza sorting icons y bindings
         const headers = container.querySelectorAll("th[data-column]");
         updateSortIcons(headers);
         headers.forEach(header => {
@@ -201,32 +212,49 @@ function renderViewGrades(container) {
 
     function renderGradeRow(grade) {
         const repoLink = grade.student_repository_name ?
-            `<a href="${grade.student_repository_url}" target="_blank" class="underline text-blue-700">${grade.student_repository_name}</a>` : "";
+            `<a href="${grade.student_repository_url}" target="_blank" class="underline text-blue-700">${grade.student_repository_name}</a>` : "N/A";
+
+        // <<< 5. Lógica para manejar las fechas y resaltar entregas tardías >>>
+        const fechaEntrega = grade.submission_timestamp;
+        const fechaLimite = grade.deadline;
+        let entregaTardia = false;
+        
+        if (fechaEntrega && fechaLimite) {
+            entregaTardia = new Date(fechaEntrega) > new Date(fechaLimite);
+        }
+
+        // Aplicar clase CSS si la entrega es tardía
+        const fechaEntregaClass = entregaTardia ? 'text-red-600 font-bold' : '';
+
         return `
             <tr class="even:bg-sky-50 odd:bg-white">
                 <td class="p-3 break-all">${grade.github_username}</td>
                 <td class="p-3 break-all">${grade.roster_identifier || ""}</td>
                 <td class="p-3 break-all">${repoLink}</td>
-                <td class="p-3 break-all">${formatDate(grade.submission_timestamp)}</td>
-                <td class="p-3 break-all">${formatGrade(grade.points_awarded)}</td>
+                <td class="p-3 break-all ${fechaEntregaClass}">${formatDate(fechaEntrega)}</td>
+                <td class="p-3 break-all">${formatDate(fechaLimite)}</td>
+                <td class="p-3 break-all text-center">${formatGrade(grade.points_awarded)}</td>
             </tr>`;
     }
 
     function formatDate(timestamp) {
-        if (!timestamp) return "";
+        if (!timestamp) return "---";
         const d = new Date(timestamp);
+        // Formato DD/MM/AAAA HH:MM
         return `${d.getDate().toString().padStart(2, "0")}/${
-            (d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
+            (d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()} ${
+            d.getHours().toString().padStart(2, "0")}:${
+            d.getMinutes().toString().padStart(2, "0")}`;
     }
 
     function formatGrade(points) {
-        return points != null ? points / 10 : "";
+        return points != null ? (points / 10).toFixed(1) : "---"; // Muestra un decimal
     }
 
     function updatePagination() {
         const total = gradesFiltered.length;
         const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-        gGradesCount.textContent = `Mostrando ${Math.min(PAGE_SIZE, total)} de ${total}`;
+        gGradesCount.textContent = `Mostrando ${Math.min(PAGE_SIZE, gradesFiltered.slice((currentPage - 1) * PAGE_SIZE).length)} de ${total}`;
         gPageInfo.textContent = `Página ${currentPage} de ${totalPages}`;
         gPrev.disabled = currentPage <= 1;
         gNext.disabled = currentPage >= totalPages;
@@ -238,7 +266,7 @@ function renderViewGrades(container) {
             let sortIcon = header.querySelector(".sort-icon");
             if (!sortIcon) {
                 sortIcon = document.createElement("span");
-                sortIcon.className = "sort-icon";
+                sortIcon.className = "sort-icon ml-1";
                 header.appendChild(sortIcon);
             }
             sortIcon.textContent = col === currentSortColumn ? (isAscending ? "▲" : "▼") : "";
@@ -247,6 +275,7 @@ function renderViewGrades(container) {
 
     // --- Plantilla base ---
     function getGradesHTMLTemplate() {
+        // <<< 6. Añadir la columna "Fecha Límite" a la plantilla HTML >>>
         return `
             <div class="bg-white shadow rounded-2xl p-7">
                 <h2 class="text-2xl font-extrabold mb-4 text-blue-900 text-center">📊 Notas y Entregas</h2>
@@ -282,9 +311,10 @@ function renderViewGrades(container) {
                                     <th class="p-3 border-b text-left">Email</th>
                                     <th class="p-3 border-b text-left">Repo</th>
                                     <th class="p-3 border-b text-left cursor-pointer" data-column="submission_timestamp">
-                                        Fecha <span class="sort-icon"></span>
+                                        Fecha Entrega <span class="sort-icon"></span>
                                     </th>
-                                    <th class="p-3 border-b text-left cursor-pointer" data-column="points_awarded">
+                                    <th class="p-3 border-b text-left">Fecha Límite</th>
+                                    <th class="p-3 border-b text-center cursor-pointer" data-column="points_awarded">
                                         Nota <span class="sort-icon"></span>
                                     </th>                 
                                 </tr>
