@@ -1,13 +1,13 @@
 /**
- * Renderiza la vista para mostrar las notas y entregas en el contenedor proporcionado.
+ * Renderiza la vista para mostrar las notas y entregas. (Estilo v2.0 Futurist)
  * @param {HTMLElement} container - El elemento HTML donde se renderizará la vista.
  */
 function renderViewGrades(container) {
-    // Render HTML base
+    // Renderiza la plantilla HTML base con los nuevos estilos
     container.innerHTML = getGradesHTMLTemplate();
     setupHelpTokenModal("help-token-btn-grades");
 
-    // --- DOM references ---
+    // --- Referencias DOM (sin cambios en la lógica) ---
     const $ = sel => container.querySelector(sel);
     const gToken = $("#g-token");
     const gClassroom = $("#g-classroom");
@@ -24,18 +24,18 @@ function renderViewGrades(container) {
     const gNext = $("#g-next-page");
     const gPageInfo = $("#g-grades-page");
 
-    // --- State variables ---
+    // --- Variables de estado (sin cambios en la lógica) ---
     const API_VERSION = "2022-11-28";
     const PAGE_SIZE = 10;
     let apiToken = "";
-    let assignmentsCache = []; // <<< 1. Guardar la info completa de los assignments
+    let assignmentsCache = [];
     let gradesAll = [];
     let gradesFiltered = [];
     let currentPage = 1;
     let currentSortColumn = "points_awarded";
     let isAscending = false;
 
-    // --- Event bindings ---
+    // --- Lógica de eventos y fetch (sin cambios) ---
     gToken.addEventListener("change", handleLoadClassrooms);
     gStep1.onsubmit = handleLoadAssignments;
     gStep2.onsubmit = handleLoadGrades;
@@ -43,155 +43,24 @@ function renderViewGrades(container) {
     gPrev.onclick = () => changePage(-1);
     gNext.onclick = () => changePage(1);
 
-    // --- Event Handlers ---
+    async function handleLoadClassrooms() { apiToken = gToken.value.trim(); gClassroom.innerHTML = `<option disabled selected value="">Cargando...</option>`; gLoading.textContent = "Cargando classrooms..."; gError.textContent = ""; try { showSpinner(); const res = await fetch("https://api.github.com/classrooms", { headers: githubHeaders(apiToken) }); hideSpinner(); if (!res.ok) throw new Error("Token inválido o sin acceso."); const classrooms = await res.json(); gClassroom.innerHTML = `<option disabled selected value="">--- Selecciona un classroom ---</option>`; classrooms.forEach(cl => { gClassroom.innerHTML += `<option value="${cl.id}">${cl.name}</option>`; }); if (classrooms.length === 0) gError.textContent = "No se encontraron classrooms."; } catch (e) { gClassroom.innerHTML = `<option disabled selected value="">Error</option>`; gError.textContent = e.message; } finally { gLoading.textContent = ""; } }
+    async function handleLoadAssignments(ev) { ev.preventDefault(); gAssignment.innerHTML = `<option disabled selected value="">Cargando...</option>`; gError.textContent = ""; gLoading.textContent = "Cargando assignments..."; gGradesView.classList.add('hidden'); gStep2.classList.add('hidden'); try { const classId = gClassroom.value; if (!classId) throw new Error("Selecciona un classroom"); showSpinner(); const res = await fetch(`https://api.github.com/classrooms/${classId}/assignments`, { headers: githubHeaders(apiToken) }); hideSpinner(); if (!res.ok) throw new Error("No se pueden obtener assignments."); const assignments = await res.json(); assignmentsCache = assignments; gAssignment.innerHTML = `<option disabled selected value="">--- Selecciona un assignment ---</option>`; assignments.forEach(a => gAssignment.innerHTML += `<option value="${a.id}">${a.title}</option>`); if (assignments.length > 0) gStep2.classList.remove('hidden'); else gError.textContent = "Este classroom no tiene assignments."; } catch (e) { gError.textContent = e.message; } finally { gLoading.textContent = ""; } }
+    async function handleLoadGrades(ev) { ev.preventDefault(); gGradesView.classList.add('hidden'); gError.textContent = ''; gLoading.textContent = "Cargando notas..."; try { const assignmentId = gAssignment.value; if (!assignmentId) throw new Error("Selecciona un assignment"); const selectedAssignment = assignmentsCache.find(a => a.id == assignmentId); showSpinner(); const res = await fetch(`https://api.github.com/assignments/${assignmentId}/grades`, { headers: githubHeaders(apiToken) }); hideSpinner(); if (!res.ok) throw new Error("No se pueden obtener notas."); gradesAll = await res.json(); gradesAll.forEach(grade => { grade.deadline = selectedAssignment.deadline; }); gradesFiltered = gradesAll; currentPage = 1; sortGrades(); renderGradesTable(); gGradesView.classList.remove('hidden'); } catch (e) { gError.textContent = e.message; } finally { gLoading.textContent = ''; } }
+    function handleFilter() { const q = gGradeFilter.value.toLowerCase(); gradesFiltered = gradesAll.filter(g => (g.github_username + " " + (g.roster_identifier || "")).toLowerCase().includes(q)); currentPage = 1; renderGradesTable(); }
+    function changePage(delta) { currentPage += delta; renderGradesTable(); }
+    function githubHeaders(token) { return { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": API_VERSION }; }
+    function sortGrades() { gradesFiltered.sort((a, b) => { const valA = getSortValue(a, currentSortColumn); const valB = getSortValue(b, currentSortColumn); if (valA < valB) return isAscending ? -1 : 1; if (valA > valB) return isAscending ? 1 : -1; return 0; }); }
+    function getSortValue(item, column) { if (column === "points_awarded") return item.points_awarded != null ? item.points_awarded / 10 : -1; if (column === "submission_timestamp") return item.submission_timestamp ? new Date(item.submission_timestamp) : new Date(0); return item[column] || ""; }
 
-    async function handleLoadClassrooms() {
-        apiToken = gToken.value.trim();
-        gClassroom.innerHTML = `<option disabled selected value="">Cargando classrooms...</option>`;
-        gLoading.textContent = "Cargando classrooms...";
-        gError.textContent = "";
-
-        try {
-            showSpinner();
-            const res = await fetch("https://api.github.com/classrooms", {
-                headers: githubHeaders(apiToken)
-            });
-            hideSpinner();
-
-            if (!res.ok) throw new Error("Token inválido o sin acceso a classrooms.");
-            const classrooms = await res.json();
-
-            gClassroom.innerHTML = `<option disabled selected value="">--- Selecciona un classroom ---</option>`;
-            classrooms.forEach(cl => {
-                gClassroom.innerHTML += `<option value="${cl.id}">${cl.name}</option>`;
-            });
-            if (classrooms.length === 0) gError.textContent = "No se encontraron classrooms disponibles.";
-        } catch (e) {
-            gClassroom.innerHTML = `<option disabled selected value="">Error</option>`;
-            gError.textContent = e.message;
-        } finally {
-            gLoading.textContent = "";
-        }
-    }
-
-    async function handleLoadAssignments(ev) {
-        ev.preventDefault();
-        gAssignment.innerHTML = `<option disabled selected value="">Cargando assignments...</option>`;
-        gError.textContent = "";
-        gLoading.textContent = "Cargando assignments...";
-        gGradesView.classList.add('hidden');
-        gStep2.classList.add('hidden');
-        try {
-            const classId = gClassroom.value;
-            if (!classId) throw new Error("Selecciona un classroom");
-            showSpinner();
-            const res = await fetch(`https://api.github.com/classrooms/${classId}/assignments`, {
-                headers: githubHeaders(apiToken)
-            });
-            hideSpinner();
-
-            if (!res.ok) throw new Error("No se pueden obtener assignments.");
-
-            const assignments = await res.json();
-            assignmentsCache = assignments; // <<< 2. Almacenar los assignments en el caché
-            
-            gAssignment.innerHTML = `<option disabled selected value="">--- Selecciona un assignment ---</option>`;
-            assignments.forEach(a =>
-                gAssignment.innerHTML += `<option value="${a.id}">${a.title}</option>`
-            );
-
-            if (assignments.length > 0) gStep2.classList.remove('hidden');
-            else gError.textContent = "Este classroom no tiene assignments.";
-        } catch (e) {
-            gError.textContent = e.message;
-        } finally {
-            gLoading.textContent = "";
-        }
-    }
-
-    async function handleLoadGrades(ev) {
-        ev.preventDefault();
-        gGradesView.classList.add('hidden');
-        gError.textContent = '';
-        gLoading.textContent = "Cargando notas...";
-        try {
-            const assignmentId = gAssignment.value;
-            if (!assignmentId) throw new Error("Selecciona un assignment");
-
-            // <<< 3. Recuperar el assignment seleccionado del caché
-            const selectedAssignment = assignmentsCache.find(a => a.id == assignmentId);
-            
-            showSpinner();
-            const res = await fetch(`https://api.github.com/assignments/${assignmentId}/grades`, {
-                headers: githubHeaders(apiToken)
-            });
-            hideSpinner();
-
-            if (!res.ok) throw new Error("No se pueden obtener notas.");
-            gradesAll = await res.json();
-
-            // <<< 4. Añadir el deadline a cada objeto 'grade' para facilitar el renderizado
-            gradesAll.forEach(grade => {
-                grade.deadline = selectedAssignment.deadline;
-            });
-            console.log(gradesAll,"notas")
-            gradesFiltered = gradesAll;
-            currentPage = 1;
-            sortGrades();
-            renderGradesTable();
-            gGradesView.classList.remove('hidden');
-        } catch (e) {
-            gError.textContent = e.message;
-        } finally {
-            gLoading.textContent = '';
-        }
-    }
-
-    function handleFilter() {
-        const q = gGradeFilter.value.toLowerCase();
-        gradesFiltered = gradesAll.filter(g =>
-            (g.github_username + " " + (g.roster_identifier || "")).toLowerCase().includes(q)
-        );
-        currentPage = 1;
-        renderGradesTable();
-    }
-
-    function changePage(delta) {
-        currentPage += delta;
-        renderGradesTable();
-    }
-
-    // --- Helpers ---
-    function githubHeaders(token) {
-        return {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/vnd.github+json",
-            "X-GitHub-Api-Version": API_VERSION,
-        };
-    }
-
-    function sortGrades() {
-        gradesFiltered.sort((a, b) => {
-            const valA = getSortValue(a, currentSortColumn);
-            const valB = getSortValue(b, currentSortColumn);
-            if (valA < valB) return isAscending ? -1 : 1;
-            if (valA > valB) return isAscending ? 1 : -1;
-            return 0;
-        });
-    }
-
-    function getSortValue(item, column) {
-        if (column === "points_awarded") return item.points_awarded != null ? item.points_awarded / 10 : -1; // -1 para no calificados
-        if (column === "submission_timestamp") return item.submission_timestamp ? new Date(item.submission_timestamp) : new Date(0); // 1970 para no entregados
-        return item[column] || "";
-    }
-
+    /**
+     * Renderiza la tabla de notas con el estilo v2.0
+     */
     function renderGradesTable() {
         const start = (currentPage - 1) * PAGE_SIZE;
         const end = start + PAGE_SIZE;
         const grades = gradesFiltered.slice(start, end);
 
-        gGradesTbody.innerHTML = grades.map(renderGradeRow).join("");
+        gGradesTbody.innerHTML = grades.map(renderGradeRow).join("") || `<tr><td colspan="6" class="text-center p-6 text-slate-400">No hay datos para mostrar.</td></tr>`;
         updatePagination();
 
         const headers = container.querySelectorAll("th[data-column]");
@@ -200,21 +69,20 @@ function renderViewGrades(container) {
             header.onclick = () => {
                 const col = header.getAttribute("data-column");
                 if (currentSortColumn === col) isAscending = !isAscending;
-                else {
-                    currentSortColumn = col;
-                    isAscending = true;
-                }
+                else { currentSortColumn = col; isAscending = true; }
                 sortGrades();
                 renderGradesTable();
             };
         });
     }
 
+    /**
+     * Renderiza una fila de la tabla de notas con el estilo v2.0
+     */
     function renderGradeRow(grade) {
         const repoLink = grade.student_repository_name ?
-            `<a href="${grade.student_repository_url}" target="_blank" class="underline text-blue-700">${grade.student_repository_name}</a>` : "N/A";
+            `<a href="${grade.student_repository_url}" target="_blank" class="font-semibold text-cyan-400 hover:underline hover:text-cyan-300">${grade.student_repository_name}</a>` : "N/A";
 
-        // <<< 5. Lógica para manejar las fechas y resaltar entregas tardías >>>
         const fechaEntrega = grade.submission_timestamp;
         const fechaLimite = grade.deadline;
         let entregaTardia = false;
@@ -223,109 +91,88 @@ function renderViewGrades(container) {
             entregaTardia = new Date(fechaEntrega) > new Date(fechaLimite);
         }
 
-        // Aplicar clase CSS si la entrega es tardía
-        const fechaEntregaClass = entregaTardia ? 'text-red-600 font-bold' : '';
+        const fechaEntregaClass = entregaTardia ? 'text-red-400 font-semibold' : 'text-slate-300';
 
         return `
-            <tr class="even:bg-sky-50 odd:bg-white">
-                <td class="p-3 break-all">${grade.github_username}</td>
-                <td class="p-3 break-all">${grade.roster_identifier || ""}</td>
-                <td class="p-3 break-all">${repoLink}</td>
-                <td class="p-3 break-all ${fechaEntregaClass}">${formatDate(fechaEntrega)}</td>
-                <td class="p-3 break-all">${formatDate(fechaLimite)}</td>
-                <td class="p-3 break-all text-center">${formatGrade(grade.points_awarded)}</td>
+            <tr class="border-b border-slate-700/50 transition-colors duration-200 hover:bg-slate-800/50">
+                <td class="p-3 text-slate-300 font-medium">${grade.github_username}</td>
+                <td class="p-3 text-slate-400">${grade.roster_identifier || "—"}</td>
+                <td class="p-3 text-slate-400 break-all">${repoLink}</td>
+                <td class="p-3 ${fechaEntregaClass}">${formatDate(fechaEntrega)}</td>
+                <td class="p-3 text-slate-400">${formatDate(fechaLimite)}</td>
+                <td class="p-3 text-center text-xl font-bold text-cyan-300">${formatGrade(grade.points_awarded)}</td>
             </tr>`;
     }
 
-    function formatDate(timestamp) {
-        if (!timestamp) return "---";
-        const d = new Date(timestamp);
-        // Formato DD/MM/AAAA HH:MM
-        return `${d.getDate().toString().padStart(2, "0")}/${
-            (d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()} ${
-            d.getHours().toString().padStart(2, "0")}:${
-            d.getMinutes().toString().padStart(2, "0")}`;
-    }
+    // --- Funciones de formato y paginación (con pequeñas mejoras) ---
+    function formatDate(timestamp) { if (!timestamp) return "—"; const d = new Date(timestamp); return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`; }
+    function formatGrade(points) { return points != null ? (points / 10).toFixed(1) : "—"; }
+    function updatePagination() { const total = gradesFiltered.length; const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE)); gGradesCount.textContent = `Mostrando ${Math.min(PAGE_SIZE, gradesFiltered.slice((currentPage - 1) * PAGE_SIZE).length)} de ${total} registros`; gPageInfo.textContent = `Página ${currentPage} de ${totalPages}`; gPrev.disabled = currentPage <= 1; gNext.disabled = currentPage >= totalPages; }
+    function updateSortIcons(headers) { headers.forEach(header => { const col = header.getAttribute("data-column"); let sortIcon = header.querySelector(".sort-icon"); if (!sortIcon) { sortIcon = document.createElement("span"); sortIcon.className = "sort-icon ml-1 text-cyan-400"; header.appendChild(sortIcon); } sortIcon.textContent = col === currentSortColumn ? (isAscending ? "▲" : "▼") : ""; }); }
 
-    function formatGrade(points) {
-        return points != null ? (points / 10).toFixed(1) : "---"; // Muestra un decimal
-    }
-
-    function updatePagination() {
-        const total = gradesFiltered.length;
-        const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-        gGradesCount.textContent = `Mostrando ${Math.min(PAGE_SIZE, gradesFiltered.slice((currentPage - 1) * PAGE_SIZE).length)} de ${total}`;
-        gPageInfo.textContent = `Página ${currentPage} de ${totalPages}`;
-        gPrev.disabled = currentPage <= 1;
-        gNext.disabled = currentPage >= totalPages;
-    }
-
-    function updateSortIcons(headers) {
-        headers.forEach(header => {
-            const col = header.getAttribute("data-column");
-            let sortIcon = header.querySelector(".sort-icon");
-            if (!sortIcon) {
-                sortIcon = document.createElement("span");
-                sortIcon.className = "sort-icon ml-1";
-                header.appendChild(sortIcon);
-            }
-            sortIcon.textContent = col === currentSortColumn ? (isAscending ? "▲" : "▼") : "";
-        });
-    }
-
-    // --- Plantilla base ---
+    /**
+     * Devuelve la plantilla HTML base de la vista con el estilo v2.0
+     */
     function getGradesHTMLTemplate() {
-        // <<< 6. Añadir la columna "Fecha Límite" a la plantilla HTML >>>
         return `
-            <div class="bg-white shadow rounded-2xl p-7">
-                <h2 class="text-2xl font-extrabold mb-4 text-blue-900 text-center">📊 Notas y Entregas</h2>
-                <form id="gstep1-form" class="space-y-4 mb-6">
-                    ${renderTokenInput({inputId: "g-token", btnId: "help-token-btn-grades"})}
-                    <div>
-                        <label class="block text-sm font-semibold text-blue-700 mb-1">Classroom:</label>
-                        <select id="g-classroom" class="border px-3 py-2 rounded-lg w-full focus:ring" required>
-                            <option disabled selected hidden value="">--- Selecciona un classroom ---</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="bg-blue-700 text-white font-semibold rounded-lg py-2 shadow hover:bg-blue-900 transition w-full">Listar assignments</button>
-                </form>
-                <form id="gstep2-form" class="space-y-4 hidden">
-                    <div>
-                        <label class="block text-sm font-semibold text-blue-700 mb-1">Assignment:</label>
-                        <select id="g-assignment" class="border px-3 py-2 rounded-lg w-full focus:ring" required></select>
-                    </div>
-                    <button type="submit" class="bg-green-600 text-white font-semibold rounded-lg py-2 shadow hover:bg-green-800 transition w-full">Ver entregas y notas</button>
-                </form>
-                <div id="g-error" class="text-red-600 font-medium mt-2"></div>
-                <div id="g-loading" class="text-blue-700 font-medium mt-2"></div>
+            <div class="glass-panel rounded-xl p-6 md:p-8 w-full space-y-6">
+                <h2 class="text-2xl md:text-3xl font-bold text-cyan-300 text-center tracking-wider">📊 Notas y Entregas</h2>
+                
+                <!-- PASO 1: SELECCIONAR CLASSROOM -->
+                <div class="border border-slate-700/50 p-5 rounded-lg">
+                    <h3 class="font-semibold text-lg text-slate-300 mb-4 border-b border-slate-700 pb-2">Paso 1: Seleccionar Classroom</h3>
+                    <form id="gstep1-form" class="space-y-5">
+                        ${renderTokenInput({inputId: "g-token", btnId: "help-token-btn-grades"})}
+                        <div>
+                            <label class="block text-sm font-semibold text-cyan-200 mb-2">Classroom:</label>
+                            <select id="g-classroom" class="glass-panel w-full px-3 py-2.5 rounded-md border border-cyan-400/20 focus:ring-2 focus:ring-cyan-400 focus:outline-none" required>
+                                <option disabled selected hidden value="">--- Selecciona un classroom ---</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-cyan-600 text-slate-900 font-bold py-3 px-4 rounded-md transition-all duration-200 shadow-lg shadow-cyan-500/20 hover:bg-cyan-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-cyan-400">Listar Assignments</button>
+                    </form>
+                </div>
+
+                <!-- PASO 2: SELECCIONAR ASSIGNMENT -->
+                <div id="gstep2-form" class="border border-slate-700/50 p-5 rounded-lg hidden">
+                     <h3 class="font-semibold text-lg text-slate-300 mb-4 border-b border-slate-700 pb-2">Paso 2: Seleccionar Assignment</h3>
+                    <form class="space-y-5">
+                        <div>
+                            <label class="block text-sm font-semibold text-cyan-200 mb-2">Assignment:</label>
+                            <select id="g-assignment" class="glass-panel w-full px-3 py-2.5 rounded-md border border-cyan-400/20 focus:ring-2 focus:ring-cyan-400 focus:outline-none" required></select>
+                        </div>
+                        <button type="submit" class="w-full bg-emerald-600 text-white font-semibold py-3 px-4 rounded-md transition-all duration-200 shadow-lg shadow-emerald-500/20 hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-emerald-500">Ver Entregas y Notas</button>
+                    </form>
+                </div>
+
+                <div id="g-error" class="text-red-400 font-medium mt-2 text-center"></div>
+                <div id="g-loading" class="text-cyan-300 font-medium mt-2 text-center"></div>
+
+                <!-- VISTA DE NOTAS -->
                 <div id="g-gradesview" class="hidden mt-6">
-                    <div class="mb-3 flex items-center">
-                        <input type="text" id="g-gradefilter" placeholder="Filtrar por usuario/email" class="border px-2 py-1 mr-3 rounded"/>
-                        <span id="g-grades-count" class="text-xs text-gray-700"></span>
+                    <div class="mb-4 flex flex-col sm:flex-row gap-4 items-center justify-between">
+                        <input type="text" id="g-gradefilter" placeholder="Filtrar por usuario o email..." class="glass-panel w-full sm:w-auto px-3 py-2.5 rounded-md border border-cyan-400/20 focus:ring-2 focus:ring-cyan-400 focus:outline-none placeholder-slate-500"/>
+                        <span id="g-grades-count" class="text-xs text-slate-400 flex-shrink-0"></span>
                     </div>
-                    <div class="w-full overflow-x-auto rounded border shadow">
-                        <table id="g-grades-table" class="w-full min-w-full border-collapse text-sm">
-                            <thead class="bg-sky-100">
+                    <div class="w-full overflow-x-auto border border-slate-700/50 rounded-lg">
+                        <table id="g-grades-table" class="w-full min-w-full text-sm">
+                            <thead class="border-b-2 border-cyan-400/30">
                                 <tr>
-                                    <th class="p-3 border-b text-left">Usuario</th>
-                                    <th class="p-3 border-b text-left">Email</th>
-                                    <th class="p-3 border-b text-left">Repo</th>
-                                    <th class="p-3 border-b text-left cursor-pointer" data-column="submission_timestamp">
-                                        Fecha Entrega <span class="sort-icon"></span>
-                                    </th>
-                                    <th class="p-3 border-b text-left">Fecha Límite</th>
-                                    <th class="p-3 border-b text-center cursor-pointer" data-column="points_awarded">
-                                        Nota <span class="sort-icon"></span>
-                                    </th>                 
+                                    <th class="p-3 text-left font-semibold text-slate-300 tracking-wider">Usuario</th>
+                                    <th class="p-3 text-left font-semibold text-slate-300 tracking-wider">Email</th>
+                                    <th class="p-3 text-left font-semibold text-slate-300 tracking-wider">Repo</th>
+                                    <th class="p-3 text-left font-semibold text-slate-300 tracking-wider cursor-pointer" data-column="submission_timestamp">Fecha Entrega</th>
+                                    <th class="p-3 text-left font-semibold text-slate-300 tracking-wider">Fecha Límite</th>
+                                    <th class="p-3 text-center font-semibold text-slate-300 tracking-wider cursor-pointer" data-column="points_awarded">Nota</th>                 
                                 </tr>
                             </thead>
-                            <tbody class="divide-y" id="g-grades-tbody"></tbody>
+                            <tbody id="g-grades-tbody"></tbody>
                         </table>
                     </div>
                     <div class="flex justify-between items-center mt-4">
-                        <button id="g-prev-page" class="bg-blue-700 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-900 transition disabled:opacity-50" disabled>Anterior</button>
-                        <span id="g-grades-page" class="text-sm text-gray-700"></span>
-                        <button id="g-next-page" class="bg-blue-700 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-900 transition disabled:opacity-50" disabled>Siguiente</button>
+                        <button id="g-prev-page" class="border border-cyan-600 text-cyan-400 px-4 py-2 rounded-md text-sm transition hover:bg-cyan-600/20 disabled:opacity-40 disabled:border-slate-600 disabled:text-slate-500 disabled:cursor-not-allowed">Anterior</button>
+                        <span id="g-grades-page" class="text-sm text-slate-400 font-medium"></span>
+                        <button id="g-next-page" class="border border-cyan-600 text-cyan-400 px-4 py-2 rounded-md text-sm transition hover:bg-cyan-600/20 disabled:opacity-40 disabled:border-slate-600 disabled:text-slate-500 disabled:cursor-not-allowed">Siguiente</button>
                     </div>
                 </div>
             </div>

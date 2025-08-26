@@ -1,0 +1,28 @@
+<!-- login.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css"></head>
+<body class="bg-gradient-to-br from-slate-950 via-black to-blue-950/50 flex items-center justify-center h-screen">
+    <div class="glass-panel text-center p-10 rounded-xl">
+        <h1 class="text-3xl font-bold text-cyan-300 mb-4 tracking-wider">GitHub Classroom Helper</h1>
+        <p class="text-slate-400 mb-8">Inicia sesión con tu cuenta de GitHub para continuar</p>
+        <button id="login-btn" class="w-full bg-cyan-600 text-slate-900 font-bold py-3 px-4 rounded-md shadow-lg shadow-cyan-500/20 hover:bg-cyan-500">
+            Iniciar Sesión con GitHub
+        </button>
+    </div>
+
+    <script>
+        document.getElementById('login-btn').addEventListener('click', () => {
+            const client_id = 'Ov23liLC8NRT7Z3lutSa';
+            const redirect_uri = window.location.origin + '/callback.html'; // Asegúrate que esta URL esté en tu config de GitHub App
+            const scope = 'read:org repo user:email';
+            
+            // Redirigir al usuario a la página de autorización de GitHub
+            window.location.href = `https://github.com/login/oauth/authorize?client_id=${client_id}&redirect_uri=${redirect_uri}&scope=${scope}`;
+        });
+    </script>
+</body>
+</html>

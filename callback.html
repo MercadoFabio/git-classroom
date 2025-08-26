@@ -1,0 +1,63 @@
+
+<!-- callback.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <title>Autenticando...</title>
+     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gradient-to-br from-slate-950 via-black to-blue-950/50 flex items-center justify-center h-screen">
+    <div class="flex flex-col items-center gap-4">
+        <div class="h-12 w-12 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+        <p id="status-text" class="text-cyan-300 text-lg font-semibold tracking-widest">AUTENTICANDO...</p>
+    </div>
+
+    <script>
+        // 1. Obtener el 'code' de los parámetros de la URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+
+        if (code) {
+            // 2. Llamar a nuestra Netlify Function para que haga el trabajo sucio
+            fetch('/.netlify/functions/get-github-token', { // Esta es la ruta a tu función
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code })
+            })
+            .then(res => {
+                if (!res.ok) {
+                    // Si la respuesta de la función no es 2xx, la convertimos en un error
+                    return res.json().then(errorData => {
+                        throw new Error(errorData.error_description || 'Error en el servidor de autenticación');
+                    });
+                }
+                return res.json();
+            })
+            .then(data => {
+                if (data.access_token) {
+                    // 3. ¡Éxito! Guardar el token y redirigir
+                    sessionStorage.setItem('github_token', data.access_token);
+                    window.location.replace('/index.html'); 
+                } else {
+                    // Manejar errores devueltos por la API de GitHub a través de nuestra función
+                    throw new Error(data.error_description || 'No se recibió el token de acceso.');
+                }
+            })
+            .catch(err => {
+                // 4. Capturar cualquier error y mostrarlo
+                document.getElementById('status-text').textContent = 'Error de autenticación.';
+                alert(err.message);
+                // Redirigir de vuelta al login después de un error
+                setTimeout(() => window.location.replace('/login.html'), 2000);
+            });
+        } else {
+            // Si no hay código en la URL
+            const error = urlParams.get('error_description') || 'No se recibió el código de autorización.';
+            alert('Error: ' + error);
+            window.location.replace('/login.html');
+        }
+    </script>
+</body>
+</html>

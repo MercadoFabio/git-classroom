@@ -1,5 +1,5 @@
 /**
- * Hace funcional el "¿Cómo obtener el token?".
+ * Hace funcional el "¿Cómo obtener el token?". (Estilo v2.0 Futurist)
  * Debes pasarle el ID del botón o el elemento botón.
  * El modal se crea solo una vez en el body.
  */
@@ -8,40 +8,51 @@ function setupHelpTokenModal(btnId) {
     if (!modal) {
         modal = document.createElement("div");
         modal.id = "help-token-modal";
-        modal.className = "fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 hidden";
+        // Fondo con desenfoque para un efecto más moderno
+        modal.className = "fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 hidden";
         modal.innerHTML = `
-            <div class="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 relative">
+            <div class="glass-panel rounded-xl shadow-lg shadow-cyan-500/10 max-w-lg w-full p-6 m-4 relative border border-cyan-400/20">
                 <button id="close-help-token"
-                        class="absolute top-3 right-3 text-gray-400 hover:text-blue-700 text-xl font-bold leading-none">
-                    &times;
+                        class="absolute top-4 right-4 text-slate-400 hover:text-cyan-300 transition-colors duration-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                 </button>
-                <h2 class="text-xl font-bold text-blue-900 mb-4">¿Cómo obtener el token de GitHub?</h2>
-                <ol class="list-decimal list-inside space-y-2 text-gray-700 text-sm">
-                    <li>Inicia sesión en <a href="https://github.com" target="_blank" class="text-blue-700 underline">GitHub</a>.</li>
-                    <li>Ve a <b>Settings</b> &gt; <b>Developer settings</b> &gt; <b>Personal access tokens</b>.</li>
-                    <li>Haz clic en <b>Generate new token</b> (classic).</li>
-                    <li>Selecciona permisos: <code>read:org</code>, <code>repo</code>, <code>read:user</code>.</li>
-                    <li>Haz clic en <b>Generate token</b> y copia el token.</li>
+                <h2 class="text-xl font-bold text-cyan-300 mb-4 tracking-wide">¿Cómo Obtener el Token de GitHub?</h2>
+                <ol class="list-decimal list-inside space-y-3 text-slate-300 text-sm">
+                    <li>Inicia sesión en <a href="https://github.com" target="_blank" class="font-semibold text-cyan-400 hover:underline hover:text-cyan-300">GitHub</a>.</li>
+                    <li>Ve a <b class="text-slate-200">Settings</b> &gt; <b class="text-slate-200">Developer settings</b> &gt; <b class="text-slate-200">Personal access tokens</b> &gt; <b class="text-slate-200">Tokens (classic)</b>.</li>
+                    <li>Haz clic en <b class="text-slate-200">Generate new token</b> y selecciona <b class="text-slate-200">Generate new token (classic)</b>.</li>
+                    <li>En <i class="text-slate-400">Select scopes</i>, marca los siguientes permisos: <br>
+                        <code class="bg-slate-700 text-cyan-300 font-mono px-2 py-1 rounded-md text-xs">read:org</code>, 
+                        <code class="bg-slate-700 text-cyan-300 font-mono px-2 py-1 rounded-md text-xs">repo</code>, 
+                        <code class="bg-slate-700 text-cyan-300 font-mono px-2 py-1 rounded-md text-xs">user:email</code>
+                    </li>
+                    <li>Haz clic en <b class="text-slate-200">Generate token</b> al final de la página y copia el token generado.</li>
                 </ol>
-                <p class="mt-4 text-xs text-gray-500">Guarda tu token en un lugar seguro. No podrás verlo después de cerrar la página.</p>
+                <p class="mt-5 text-xs text-slate-500 border-t border-slate-700 pt-3">
+                    Guarda tu token en un lugar seguro. No podrás volver a verlo después de cerrar la página de GitHub.
+                </p>
             </div>
         `;
         document.body.appendChild(modal);
     }
 
-
+    // La lógica de apertura y cierre no cambia
     function openModal() { modal.classList.remove("hidden"); }
     function closeModal() { modal.classList.add("hidden"); }
     const btn = typeof btnId === "string" ? document.getElementById(btnId) : btnId;
     if (btn) {
-        btn.removeEventListener("click", openModal); // limpias viejos
+        btn.removeEventListener("click", openModal); // Limpia oyentes antiguos
         btn.addEventListener("click", openModal);
     }
-    // Cerrar por fondo
+    
+    // Cerrar al hacer clic en el fondo
     modal.onclick = function (ev) {
         if (ev.target === modal) closeModal();
     };
-    // Cerrar por X
+    
+    // Cerrar al hacer clic en el botón 'X'
     const closeBtn = modal.querySelector("#close-help-token");
     if (closeBtn) {
         closeBtn.removeEventListener("click", closeModal);
@@ -50,7 +61,7 @@ function setupHelpTokenModal(btnId) {
 }
 
 /**
- * Genera el bloque HTML del campo "GitHub Token" reutilizable.
+ * Genera el bloque HTML del campo "GitHub Token" reutilizable. (Estilo v2.0 Futurist)
  * @param {Object} opts - Opcional: puedes customizar ids o atributos aquí si necesitas.
  */
 function renderTokenInput(opts = {}) {
@@ -59,16 +70,19 @@ function renderTokenInput(opts = {}) {
     const inputName = opts.inputName || "";
     return `
         <div>
-            <label class="block text-sm font-semibold text-blue-700 mb-1 flex items-center gap-2">
-                GitHub Token:
+            <div class="flex items-center justify-between mb-2">
+                <label for="${inputId}" class="block text-sm font-semibold text-cyan-200">
+                    GitHub Token
+                </label>
                 <button id="${btnId}" type="button"
-                    class="ml-1 text-blue-600 underline text-xs hover:text-blue-900 transition focus:outline-none"
+                    class="text-xs text-cyan-400 hover:text-cyan-300 transition-colors duration-200 focus:outline-none"
                     title="¿Cómo obtener el token?">
-                    ¿Cómo obtener el token?
+                    ¿Necesitas ayuda?
                 </button>
-            </label>
+            </div>
             <input type="password" id="${inputId}" name="${inputName}" autocomplete="off"
-                class="border px-3 py-2 rounded-lg w-full focus:ring" required/>
+                placeholder="ghp_..."
+                class="glass-panel w-full px-3 py-2.5 rounded-md border border-cyan-400/20 focus:ring-2 focus:ring-cyan-400 focus:outline-none placeholder-slate-500" required/>
         </div>
     `;
 }

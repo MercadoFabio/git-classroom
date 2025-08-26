@@ -3,28 +3,28 @@
  * @param {HTMLElement} container - Contenedor donde se renderizará la vista.
  */
 function renderViewDeliveriesSummary(container) {
-    // --- Plantilla principal ---
+    // --- Plantilla principal con estilos v2.0 ---
     container.innerHTML = `
-        <div class="bg-white shadow rounded-xl p-7">
-            <h2 class="text-2xl font-extrabold mb-4 text-blue-900 text-center">Resumen de Notas</h2>
-            <form id="summary-form" class="space-y-4">
+        <div class="glass-panel rounded-xl p-6 md:p-8 w-full">
+            <h2 class="text-2xl md:text-3xl font-bold mb-6 text-cyan-300 text-center tracking-wider">Resumen de Notas</h2>
+            <form id="summary-form" class="space-y-5">
              ${renderTokenInput({inputId: "summary-token", btnId: "help-token-btn-summary"})} 
                 <div>
-                    <label class="block text-sm font-semibold text-blue-700 mb-1">Classroom:</label>
-                    <select id="summary-classroom" class="border px-3 py-2 rounded-lg w-full focus:ring" required>
-                        <option disabled selected value="">--- Selecciona classroom ---</option>
+                    <label class="block text-sm font-semibold text-cyan-200 mb-2">Classroom:</label>
+                    <select id="summary-classroom" class="glass-panel w-full px-3 py-2.5 rounded-md border border-cyan-400/20 focus:ring-2 focus:ring-cyan-400 focus:outline-none placeholder-slate-500" required>
+                        <option disabled selected value="">--- Selecciona un classroom ---</option>
                     </select>
                 </div>
-                <button type="submit" class="bg-blue-700 text-white font-semibold rounded-lg py-2 shadow hover:bg-blue-900 transition w-full">Ver Resumen</button>
+                <button type="submit" class="w-full bg-cyan-600 text-slate-900 font-bold py-3 px-4 rounded-md transition-all duration-200 shadow-lg shadow-cyan-500/20 hover:bg-cyan-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-cyan-400">Ver Resumen</button>
             </form>
-            <div id="summary-results" class="mt-4"></div>
-            <div id="summary-error" class="text-red-600 font-medium mt-2"></div>
+            <div id="summary-results" class="mt-8"></div>
+            <div id="summary-error" class="text-red-400 font-medium mt-4 text-center"></div>
         </div>
     `;
 
     setupHelpTokenModal("help-token-btn-summary");
 
-    // -- Referencias --
+    // -- Referencias (sin cambios en la lógica) --
     const summaryToken = container.querySelector("#summary-token");
     const summaryClassroom = container.querySelector("#summary-classroom");
     const summaryForm = container.querySelector("#summary-form");
@@ -34,7 +34,7 @@ function renderViewDeliveriesSummary(container) {
     let allGrades = [];
     let studentsSummary = {};
 
-    // --- Carga de classrooms al cambiar el token ---
+    // --- Lógica de carga y fetch (sin cambios) ---
     summaryToken.addEventListener("change", async () => {
         await loadClassrooms(summaryToken.value.trim());
     });
@@ -66,7 +66,6 @@ function renderViewDeliveriesSummary(container) {
         }
     }
 
-    // --- Form submit (fetch de assignments & calificaciones) ---
     summaryForm.onsubmit = async (ev) => {
         ev.preventDefault();
         summaryResults.innerHTML = '';
@@ -89,60 +88,39 @@ function renderViewDeliveriesSummary(container) {
             renderSummaryTable(assignments.length, studentsSummary);
         } catch (e) {
             hideSpinner();
-            summaryError.textContent = "Error al obtener las notas, intente nuevamente por favor: " + e.message;
+            summaryError.textContent = "Error al obtener las notas: " + e.message;
         }
     };
 
-    // --- Lógica de fetch ---
-     async function getAssignments(classroomId, token) {
-        const asgResp = await fetch(`https://api.github.com/classrooms/${classroomId}/assignments?page=1&per_page=100`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/vnd.github+json',
-                'X-GitHub-Api-Version': "2022-11-28"
-            }
-        });
+    async function getAssignments(classroomId, token) {
+        const asgResp = await fetch(`https://api.github.com/classrooms/${classroomId}/assignments?page=1&per_page=100`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': "2022-11-28" } });
         if (!asgResp.ok) throw new Error('Error al obtener los assignments.');
         const assignments = await asgResp.json();
-        if (!Array.isArray(assignments) || assignments.length === 0) throw new Error('No se encontraron assignments para el classroom.');
-        // Ordenar por ID para tener un orden cronológico de creación
+        if (!Array.isArray(assignments) || assignments.length === 0) throw new Error('No se encontraron assignments.');
         assignments.sort((a, b) => a.id - b.id);
         return assignments;
     }
 
     async function getAllGrades(assignments, token) {
         const gradePromises = assignments.map(asg =>
-            fetch(`https://api.github.com/assignments/${asg.id}/grades`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/vnd.github+json',
-                    'X-GitHub-Api-Version': "2022-11-28"
-                }
-            }).then(resp => {
-                if (!resp.ok) throw new Error(`Error al obtener notas para assignment ${asg.id}.`);
+            fetch(`https://api.github.com/assignments/${asg.id}/grades`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': "2022-11-28" } })
+            .then(resp => {
+                if (!resp.ok) throw new Error(`Error en notas para assignment ${asg.id}.`);
                 return resp.json();
             })
         );
         return Promise.all(gradePromises);
     }
 
-    // --- Procesamiento de resultados ---
     function buildStudentSummary(allGrades) {
         const summary = {};
         allGrades.forEach(grades => {
             grades.forEach(student => {
                 const username = student.github_username;
                 if (!summary[username]) {
-                    summary[username] = {
-                        email: student.roster_identifier,
-                        entregas: 0,
-                        notaTotal: 0,
-                        notaCount: 0
-                    };
+                    summary[username] = { email: student.roster_identifier, entregas: 0, notaTotal: 0, notaCount: 0 };
                 }
-                if (student.submission_timestamp) {
-                    summary[username].entregas++;
-                }
+                if (student.submission_timestamp) summary[username].entregas++;
                 if (student.points_awarded !== null && !isNaN(student.points_awarded)) {
                     summary[username].notaTotal += Number(student.points_awarded);
                     summary[username].notaCount++;
@@ -152,30 +130,30 @@ function renderViewDeliveriesSummary(container) {
         return summary;
     }
 
-    // --- Render del resumen, tabla y controles ---
+    // --- Render del resumen, tabla y controles con estilos v2.0 ---
     function renderSummaryTable(totalAssignments, studentsSummary) {
-        // ... (Esta función no necesita cambios, la dejo por completitud)
         let pageSize = 10;
         let currentPage = 1;
         let filterText = '';
         let currentSortColumn = "avgNota", isAscending = false;
 
         summaryResults.innerHTML = `
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-                <span><strong>Total de Assignments:</strong> ${totalAssignments}</span>
-                <button id="download-excel" class="bg-green-50 text-green-800 border border-green-400 px-3 py-1 rounded-md text-xs hover:bg-green-100 focus:ring-2 focus:ring-green-200">
-                    📥 Descargar Excel
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 p-4 glass-panel rounded-lg border border-slate-700">
+                <span class="font-semibold text-slate-300">Total de Assignments: <span class="text-cyan-400 font-bold">${totalAssignments}</span></span>
+                <button id="download-excel" class="flex items-center gap-2 border border-emerald-500 text-emerald-400 px-4 py-2 rounded-md text-sm font-semibold transition hover:bg-emerald-500/20 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                    Descargar Excel
                 </button>
             </div>
-            <div>
-                <label class="block text-sm font-semibold text-blue-700 mb-1">Filtrar:</label>
-                <input type="text" id="filter-input" class="border px-3 py-2 rounded-lg w-full focus:ring" placeholder="Buscar por usuario o email"/>
+            <div class="mb-4">
+                <label class="block text-sm font-semibold text-cyan-200 mb-2">Filtrar por Usuario o Email:</label>
+                <input type="text" id="filter-input" class="glass-panel w-full px-3 py-2.5 rounded-md border border-cyan-400/20 focus:ring-2 focus:ring-cyan-400 focus:outline-none placeholder-slate-500" placeholder="Buscar..."/>
             </div>
-            <div id="table-container" class="mt-4"></div>
-            <div class="flex justify-between items-center mt-2">
-                <button id="prev-page" class="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">Anterior</button>
-                <span id="page-info" class="text-sm text-gray-700"></span>
-                <button id="next-page" class="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">Siguiente</button>
+            <div id="table-container" class="mt-4 overflow-x-auto"></div>
+            <div class="flex justify-between items-center mt-4">
+                <button id="prev-page" class="border border-cyan-600 text-cyan-400 px-4 py-2 rounded-md text-sm transition hover:bg-cyan-600/20 disabled:opacity-40 disabled:border-slate-600 disabled:text-slate-500 disabled:cursor-not-allowed">Anterior</button>
+                <span id="page-info" class="text-sm text-slate-400 font-medium"></span>
+                <button id="next-page" class="border border-cyan-600 text-cyan-400 px-4 py-2 rounded-md text-sm transition hover:bg-cyan-600/20 disabled:opacity-40 disabled:border-slate-600 disabled:text-slate-500 disabled:cursor-not-allowed">Siguiente</button>
             </div>
         `;
 
@@ -192,87 +170,58 @@ function renderViewDeliveriesSummary(container) {
             renderTablePager();
         });
 
-        prevPageBtn.addEventListener("click", () => {
-            if (currentPage > 1) {
-                currentPage--;
-                renderTablePager();
-            }
-        });
-        nextPageBtn.addEventListener("click", () => {
-            if ((currentPage) < getTotalPages()) {
-                currentPage++;
-                renderTablePager();
-            }
-        });
+        prevPageBtn.addEventListener("click", () => { if (currentPage > 1) { currentPage--; renderTablePager(); } });
+        nextPageBtn.addEventListener("click", () => { if (currentPage < getTotalPages()) { currentPage++; renderTablePager(); } });
         downloadExcelBtn.addEventListener("click", () => downloadExcelWithXLSX(studentsSummary, totalAssignments, assignments, allGrades));
         
         function filterSortPaginate() {
             let filtered = Object.keys(studentsSummary)
-                .filter(user => {
-                    const data = studentsSummary[user];
-                    return user.toLowerCase().includes(filterText) ||
-                        (data.email || '').toLowerCase().includes(filterText);
-                })
-                .reduce((obj, key) => {
-                    obj[key] = studentsSummary[key];
-                    return obj;
-                }, {});
+                .filter(user => (studentsSummary[user].email || '').toLowerCase().includes(filterText) || user.toLowerCase().includes(filterText))
+                .reduce((obj, key) => { obj[key] = studentsSummary[key]; return obj; }, {});
 
             const keysSorted = Object.keys(filtered).sort((a, b) => {
                 let vA, vB;
-                if (currentSortColumn === "avgNota") {
-                    vA = filtered[a].notaCount > 0 ? Math.ceil((filtered[a].notaTotal / filtered[a].notaCount) / 10) : 0;
-                    vB = filtered[b].notaCount > 0 ? Math.ceil((filtered[b].notaTotal / filtered[b].notaCount) / 10) : 0;
-                } else if (currentSortColumn === "porcentaje") {
-                    vA = totalAssignments ? filtered[a].entregas / totalAssignments : 0;
-                    vB = totalAssignments ? filtered[b].entregas / totalAssignments : 0;
-                } else if (currentSortColumn === "username") {
-                    vA = a; vB = b;
-                } else {
-                    vA = filtered[a][currentSortColumn] || 0;
-                    vB = filtered[b][currentSortColumn] || 0;
-                }
+                if (currentSortColumn === "avgNota") { vA = filtered[a].notaCount > 0 ? Math.ceil((filtered[a].notaTotal / filtered[a].notaCount) / 10) : 0; vB = filtered[b].notaCount > 0 ? Math.ceil((filtered[b].notaTotal / filtered[b].notaCount) / 10) : 0; } 
+                else if (currentSortColumn === "porcentaje") { vA = totalAssignments ? filtered[a].entregas / totalAssignments : 0; vB = totalAssignments ? filtered[b].entregas / totalAssignments : 0; } 
+                else if (currentSortColumn === "username") { vA = a.toLowerCase(); vB = b.toLowerCase(); } 
+                else { vA = filtered[a][currentSortColumn] || 0; vB = filtered[b][currentSortColumn] || 0; }
                 if (vA < vB) return isAscending ? -1 : 1;
                 if (vA > vB) return isAscending ? 1 : -1;
                 return 0;
             });
             
             const start = (currentPage - 1) * pageSize;
-            const end = start + pageSize;
-            const paginatedKeys = keysSorted.slice(start, end);
+            const paginatedKeys = keysSorted.slice(start, start + pageSize);
             return { current: paginatedKeys.map(k => [k, filtered[k]]), total: keysSorted.length };
         }
 
-        function getTotalPages() {
-            const totalRows = filterSortPaginate().total;
-            return Math.max(1, Math.ceil(totalRows / pageSize));
-        }
+        function getTotalPages() { return Math.max(1, Math.ceil(filterSortPaginate().total / pageSize)); }
 
         function renderTablePager() {
-            const { current, total } = filterSortPaginate();
+            const { current } = filterSortPaginate();
             let table = `
-                <table class="w-full min-w-full border-collapse text-sm">
-                    <thead class="bg-sky-100">
+                <table class="w-full min-w-full text-sm">
+                    <thead class="border-b-2 border-cyan-400/30">
                         <tr>
-                            <th class="p-3 border-b cursor-pointer" data-column="username">Usuario <span class="sort-icon">${currentSortColumn === "username" ? (isAscending ? "▲" : "▼") : ""}</span></th>
-                            <th class="p-3 border-b cursor-pointer" data-column="email">Email</th>
-                            <th class="p-3 border-b cursor-pointer" data-column="entregas">Entregas <span class="sort-icon">${currentSortColumn === "entregas" ? (isAscending ? "▲" : "▼") : ""}</span></th>
-                            <th class="p-3 border-b cursor-pointer" data-column="porcentaje">% Entregadas <span class="sort-icon">${currentSortColumn === "porcentaje" ? (isAscending ? "▲" : "▼") : ""}</span></th>
-                            <th class="p-3 border-b cursor-pointer" data-column="avgNota">Nota Promedio <span class="sort-icon">${currentSortColumn === "avgNota" ? (isAscending ? "▲" : "▼") : ""}</span></th>
+                            <th class="p-3 text-left font-semibold text-slate-300 tracking-wider cursor-pointer" data-column="username">Usuario <span class="sort-icon text-cyan-400">${currentSortColumn === "username" ? (isAscending ? "▲" : "▼") : ""}</span></th>
+                            <th class="p-3 text-left font-semibold text-slate-300 tracking-wider">Email</th>
+                            <th class="p-3 text-center font-semibold text-slate-300 tracking-wider cursor-pointer" data-column="entregas">Entregas <span class="sort-icon text-cyan-400">${currentSortColumn === "entregas" ? (isAscending ? "▲" : "▼") : ""}</span></th>
+                            <th class="p-3 text-center font-semibold text-slate-300 tracking-wider cursor-pointer" data-column="porcentaje">% Entregadas <span class="sort-icon text-cyan-400">${currentSortColumn === "porcentaje" ? (isAscending ? "▲" : "▼") : ""}</span></th>
+                            <th class="p-3 text-center font-semibold text-slate-300 tracking-wider cursor-pointer" data-column="avgNota">Nota Prom. <span class="sort-icon text-cyan-400">${currentSortColumn === "avgNota" ? (isAscending ? "▲" : "▼") : ""}</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         ${current.map(([user, data]) => {
                             const avgNota = data.notaCount > 0 ? Math.ceil((data.notaTotal / data.notaCount) / 10) : 0;
                             const porcentaje = totalAssignments > 0 ? (data.entregas / totalAssignments * 100).toFixed(1) : '0.0';
-                            return `<tr class="even:bg-sky-50 odd:bg-white">
-                                        <td class="p-2">${user}</td>
-                                        <td class="p-2">${data.email || '-'}</td>
-                                        <td class="p-2 text-center">${data.entregas}/${totalAssignments}</td>
-                                        <td class="p-2 text-center">${porcentaje}%</td>
-                                        <td class="p-2 text-center">${avgNota}</td>
+                            return `<tr class="border-b border-slate-700/50 transition-colors duration-200 hover:bg-cyan-500/10">
+                                        <td class="p-3 text-slate-300 font-medium">${user}</td>
+                                        <td class="p-3 text-slate-400">${data.email || '—'}</td>
+                                        <td class="p-3 text-center text-slate-300">${data.entregas}/${totalAssignments}</td>
+                                        <td class="p-3 text-center text-slate-300">${porcentaje}%</td>
+                                        <td class="p-3 text-center font-bold text-cyan-300">${avgNota}</td>
                                     </tr>`;
-                        }).join('')}
+                        }).join('') || `<tr><td colspan="5" class="text-center p-6 text-slate-400">No hay datos para mostrar.</td></tr>`}
                     </tbody>
                 </table>
             `;
@@ -281,12 +230,8 @@ function renderViewDeliveriesSummary(container) {
             tableContainer.querySelectorAll("th[data-column]").forEach(header => {
                 header.addEventListener("click", () => {
                     const col = header.getAttribute("data-column");
-                    if (currentSortColumn === col) {
-                        isAscending = !isAscending;
-                    } else {
-                        currentSortColumn = col;
-                        isAscending = true;
-                    }
+                    if (currentSortColumn === col) isAscending = !isAscending;
+                    else { currentSortColumn = col; isAscending = true; }
                     renderTablePager();
                 });
             });
@@ -299,8 +244,9 @@ function renderViewDeliveriesSummary(container) {
         renderTablePager();
     }
 
-    // --- Descarga Excel ---
+    // --- Descarga Excel (sin cambios en la lógica, solo en la presentación) ---
     function downloadExcelWithXLSX(studentsSummary, totalAssignments, assignments, allGrades) {
+        // ... La lógica interna de esta función no necesita cambios visuales y puede permanecer igual.
         const summaryData = [["Usuario", "Email", "Entregas", "% Entregadas", "Nota Promedio"]];
         Object.entries(studentsSummary).forEach(([user, data]) => {
             const avgNota = data.notaCount > 0 ? Math.ceil((data.notaTotal / data.notaCount) / 10) : 0;
@@ -308,10 +254,7 @@ function renderViewDeliveriesSummary(container) {
             summaryData.push([user, data.email || '-', `${data.entregas}/${totalAssignments}`, `${porcentaje}%`, avgNota]);
         });
 
-        // <<< 1. Se añaden las nuevas cabeceras para las columnas >>>
         const detailData = [["Usuario", "Email", "Tarea", "Nota Obtenida", "Fecha Último Commit", "Fecha Límite", "Estado Entrega"]];
-        
-        // El objeto de opciones para formatear la fecha
         const dateOptions = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' };
 
         assignments.forEach((assignment, index) => {
@@ -322,52 +265,31 @@ function renderViewDeliveriesSummary(container) {
                 const nota = student.points_awarded !== null ? student.points_awarded : 'Sin Nota';
                 const assignmentName = student.assignment_name || 'Sin Nombre';
 
-                // <<< 2. Lógica para obtener y formatear las fechas y el estado >>>
-                const fechaCommit = student.submission_timestamp
-                    ? new Date(student.submission_timestamp).toLocaleString('es-AR', dateOptions)
-                    : 'Sin Entrega';
-
-                const fechaLimite = assignment.deadline
-                    ? new Date(assignment.deadline).toLocaleString('es-AR', dateOptions)
-                    : 'Sin Fecha Límite';
+                const fechaCommit = student.submission_timestamp ? new Date(student.submission_timestamp).toLocaleString('es-AR', dateOptions) : 'Sin Entrega';
+                const fechaLimite = assignment.deadline ? new Date(assignment.deadline).toLocaleString('es-AR', dateOptions) : 'Sin Fecha Límite';
 
                 let estadoEntrega = 'Sin Entrega';
-                if (student.submission_timestamp) { // Si hubo entrega
-                    if (assignment.deadline) { // Y si había fecha límite
-                        // Comparamos las fechas
-                        estadoEntrega = new Date(student.submission_timestamp) <= new Date(assignment.deadline)
-                            ? 'A Tiempo'
-                            : 'Tarde';
+                if (student.submission_timestamp) {
+                    if (assignment.deadline) {
+                        estadoEntrega = new Date(student.submission_timestamp) <= new Date(assignment.deadline) ? 'A Tiempo' : 'Tarde';
                     } else {
-                        // Si hubo entrega pero no había fecha límite
                         estadoEntrega = 'Entregado';
                     }
                 }
                 
-                // <<< 3. Se añaden los nuevos datos a la fila del Excel >>>
                 detailData.push([username, email, assignmentName, nota, fechaCommit, fechaLimite, estadoEntrega]);
             });
         });
 
-        // Crear libro y hojas (sin cambios)
         const workbook = XLSX.utils.book_new();
         const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
         const detailSheet = XLSX.utils.aoa_to_sheet(detailData);
 
-        // Ajustar anchos de columna para la hoja de detalle (opcional pero recomendado)
-        detailSheet['!cols'] = [
-            { wch: 20 }, // Usuario
-            { wch: 25 }, // Email
-            { wch: 30 }, // Tarea
-            { wch: 15 }, // Nota Obtenida
-            { wch: 20 }, // Fecha Último Commit
-            { wch: 20 }, // Fecha Límite
-            { wch: 15 }  // Estado Entrega
-        ];
+        detailSheet['!cols'] = [ { wch: 20 }, { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 15 } ];
 
         XLSX.utils.book_append_sheet(workbook, summarySheet, "Resumen");
         XLSX.utils.book_append_sheet(workbook, detailSheet, "Detalle");
 
-        XLSX.writeFile(workbook, "resumen_notas_detallado.xlsx");
+        XLSX.writeFile(workbook, "resumen_notas_detallado_v2.xlsx");
     }
 }

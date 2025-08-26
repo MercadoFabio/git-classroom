@@ -3,134 +3,90 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>GitHub Classroom Assignment Helper</title>
+    <title>GitHub Classroom Helper v2.0</title>
     <!-- Favicon para la página -->
     <link rel="icon" href="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" type="image/png">
     <!-- Importación de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Estilo para el botón de navegación activo */
-        .nav-btn[aria-current="page"] {
-            color: #1d4ed8;
-            text-decoration: underline;
-            font-weight: bold;
-        }
-
-        /* Estilo para el loader */
-        .loader {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-        }
-        #student-group {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            max-height: 300px;
-            overflow-y: auto;
-            border: 1px solid #ccc;
-            padding: 10px;
-            border-radius: 8px;
-            background-color: #f9f9f9;
-        }
-
-        .student-checkbox {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .student-checkbox input {
-            cursor: pointer;
-        }
-
-        .student-checkbox label {
-            cursor: pointer;
-            font-size: 14px;
-            color: #333;
-        }
-    </style>
+    <!-- Importación de la fuente futurista 'Rajdhani' de Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+   <link rel="stylesheet" href="style.css">
+ 
 </head>
-<body class="flex flex-col min-h-screen bg-gradient-to-br from-sky-100 via-blue-200 to-blue-400">
+<body class="bg-gradient-to-br from-slate-950 via-black to-blue-950/50">
 
+<script>
+    // PASO 3.A: SCRIPT "GUARDIA" DE AUTENTICACIÓN
+    // Este script se ejecuta antes de que se renderice el resto del cuerpo.
+    // Si no hay token, redirige a la página de login.
+    if (!sessionStorage.getItem('github_token')) {
+        window.location.replace('/login.html');
+    }
+</script>
 
 <div class="flex h-screen">
 
-    <!-- Barra lateral de navegación -->
+    <!-- Barra lateral de navegación con efecto "glass" -->
     <nav id="sidebar"
-         class="bg-white shadow w-64 flex flex-col fixed inset-y-0 z-20 transform -translate-x-full transition-transform duration-300 lg:translate-x-0">
-        <div class="px-6 py-4">
-            <span class="font-bold text-blue-900 text-xl">GitHub Classroom Helper</span>
+         class="glass-panel w-64 flex-col fixed inset-y-0 z-30 transform -translate-x-full transition-transform duration-300 lg:translate-x-0 hidden lg:flex">
+        <div class="px-6 py-4 border-b border-cyan-400/10">
+            <span class="font-bold text-cyan-300 text-2xl tracking-wider">GCH v2.0</span>
         </div>
-        <div class="flex-1 px-4 space-y-2">
-            <!-- Botón para la vista de creación de assignments -->
-            <button id="nav-create"
-                    class="nav-btn w-full text-left font-semibold text-blue-700 hover:text-blue-900 px-4 py-2 rounded-lg hover:bg-blue-100"
-                    aria-current="page" type="button">Crear Assignments
-            </button>
-            <!-- Botón para la vista de notas y entregas -->
-            <button id="nav-deliveries"
-                    class="nav-btn w-full text-left font-semibold text-blue-700 hover:text-blue-900 px-4 py-2 rounded-lg hover:bg-blue-100"
-                    type="button">Ver Notas y Entregas
-            </button>
-            <!-- Botón para la vista de resumen de entregas -->
-            <button id="nav-deliveries-summary"
-                    class="nav-btn w-full text-left font-semibold text-blue-700 hover:text-blue-900 px-4 py-2 rounded-lg hover:bg-blue-100"
-                    type="button">Resumen de Entregas
-            </button>
-            <button id="nav-graphics"
-                    class="nav-btn w-full text-left font-semibold text-blue-700 hover:text-blue-900 px-4 py-2 rounded-lg hover:bg-blue-100"
-                    type="button">Graficos
+        <div class="flex-1 px-2 py-4 space-y-2">
+            <!-- Botones de navegación -->
+            <button id="nav-create" class="nav-btn w-full text-left font-semibold text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10 px-4 py-3 rounded-md transition-all duration-200" aria-current="page" type="button">Crear Assignments</button>
+            <button id="nav-deliveries" class="nav-btn w-full text-left font-semibold text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10 px-4 py-3 rounded-md transition-all duration-200" type="button">Ver Notas y Entregas</button>
+            <button id="nav-deliveries-summary" class="nav-btn w-full text-left font-semibold text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10 px-4 py-3 rounded-md transition-all duration-200" type="button">Resumen de Entregas</button>
+            <button id="nav-graphics" class="nav-btn w-full text-left font-semibold text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10 px-4 py-3 rounded-md transition-all duration-200" type="button">Gráficos</button>
+        </div>
+        
+        <!-- PASO 3.B: BOTÓN DE CERRAR SESIÓN -->
+        <div class="p-4 mt-auto border-t border-cyan-400/10">
+            <button id="logout-btn" class="w-full text-left font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 px-4 py-3 rounded-md transition-all duration-200 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" /></svg>
+                Cerrar Sesión
             </button>
         </div>
     </nav>
 
     <!-- Contenido principal -->
-    <div class="flex-1 flex flex-col">
-
-        <!-- Encabezado para dispositivos móviles -->
-        <header class="bg-white shadow sticky top-0 z-10 w-full flex items-center justify-between px-4 py-3 lg:hidden">
-            <span class="font-bold text-blue-900 text-xl">GitHub Classroom Helper</span>
-            <!-- Botón para alternar la visibilidad de la barra lateral -->
-            <button id="menu-toggle" class="text-blue-700 hover:text-blue-900 focus:outline-none">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
-                     stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/>
-                </svg>
+    <div class="flex-1 flex flex-col overflow-y-auto lg:ml-64">
+        <!-- Encabezado para móviles -->
+        <header class="glass-panel sticky top-0 z-20 w-full flex items-center justify-between px-4 py-3 lg:hidden">
+            <span class="font-bold text-cyan-300 text-xl tracking-wider">GCH v2.0</span>
+            <button id="menu-toggle" class="text-cyan-400 hover:text-white focus:outline-none">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/></svg>
             </button>
         </header>
 
         <!-- Contenedor de vistas SPA -->
-        <main id="spa-views" class="flex-1 flex flex-col items-center py-6 w-full">
-            <div class="w-full max-w-3xl flex-1 flex flex-col">
-                <!-- Vista para crear assignments -->
-                <section id="view-assignments" class="space-y-8 w-full flex-1"></section>
-                <!-- Vista para ver notas -->
-                <section id="view-grades" class="space-y-8 w-full flex-1 hidden"></section>
-                <!-- Vista para el resumen de entregas -->
-                <section id="view-deliveries-summary" class="hidden space-y-8 py-8"></section>
-                <section id="view-graphics"class="hidden space-y-8 py-8"></section>
+        <main id="spa-views" class="flex-1 flex flex-col items-center py-6 px-4 w-full">
+            <div class="w-full max-w-5xl flex-1 flex flex-col">
+                <section id="view-assignments" class="w-full flex-1"></section>
+                <section id="view-grades" class="w-full flex-1 hidden"></section>
+                <section id="view-deliveries-summary" class="w-full flex-1 hidden"></section>
+                <section id="view-graphics" class="w-full flex-1 hidden"></section>
             </div>
-            <!-- Spinner superpuesto para indicar carga -->
-            <div id="spinner-overlay"
-                 class="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50 z-50 hidden">
-                <div class="loader">
-                    <div class="h-8 w-8 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
+            
+            <!-- Spinner -->
+            <div id="spinner-overlay" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm z-50 hidden">
+                <div class="flex flex-col items-center gap-4">
+                    <div class="h-12 w-12 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                    <p class="text-cyan-300 text-lg font-semibold tracking-widest">PROCESANDO...</p>
                 </div>
             </div>
-
         </main>
 
         <!-- Pie de página -->
-        <footer class="mt-auto text-center text-sm text-gray-400 py-4 bg-white bg-opacity-80 shadow-inner w-full">
-            GitHub Classroom Helper &middot; 2025 – v1.0
+        <footer class="mt-auto text-center text-sm text-slate-500 py-4 w-full">
+            GitHub Classroom Helper &middot; 2025 – v2.0
         </footer>
-
     </div>
 </div>
 
-<!-- Scripts para las vistas y funcionalidades -->
+<!-- Scripts de la aplicación -->
 <script src="js/view-deliveri-summary.js"></script>
 <script src="js/view-grades.js"></script>
 <script src="js/create-assignments.js"></script>
@@ -140,5 +96,20 @@
 <script src="js/view-graphics.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- PASO 3.C: LÓGICA DEL BOTÓN DE CERRAR SESIÓN -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const logoutBtn = document.getElementById('logout-btn');
+        if(logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                // Borra el token de la sesión
+                sessionStorage.removeItem('github_token');
+                // Redirige a la página de login
+                window.location.replace('/login.html');
+            });
+        }
+    });
+</script>
 </body>
 </html>
