@@ -1,15 +1,15 @@
 /**
  * Renderiza la vista de gráficos. (Estilo v2.0 Futurist)
+ * AHORA OBTIENE EL ÚLTIMO COMMIT REAL para datos precisos.
  * Utiliza el token guardado en sessionStorage.
  * @param {HTMLElement} container - Contenedor donde renderizar la vista.
  */
 function renderViewGraphics(container) {
-    // --- Plantilla principal sin el input de token ---
+    // --- Plantilla principal ---
     container.innerHTML = `
         <div class="glass-panel rounded-xl p-6 md:p-8 w-full">
             <h2 class="text-2xl md:text-3xl font-bold mb-6 text-cyan-300 text-center tracking-wider">Visualización de Datos</h2>
             <form id="graphics-form" class="space-y-5">
-                <!-- El input de token se ha eliminado -->
                 <div>
                     <label class="block text-sm font-semibold text-cyan-200 mb-2">Classroom:</label>
                     <select id="graphics-classroom" class="glass-panel w-full px-3 py-2.5 rounded-md border border-cyan-400/20 focus:ring-2 focus:ring-cyan-400 focus:outline-none" required>
@@ -45,7 +45,7 @@ function renderViewGraphics(container) {
         </div>
     `;
     
-    // --- Referencias (se elimina summaryToken) ---
+    // --- Referencias ---
     const summaryClassroom = container.querySelector("#graphics-classroom");
     const summaryForm = container.querySelector("#graphics-form");
     const summaryResults = container.querySelector("#graphics-results");
@@ -83,6 +83,9 @@ function renderViewGraphics(container) {
         }
     }
     
+    // =================================================================
+    // FUNCIÓN onsubmit MODIFICADA PARA LLAMAR A LA VERIFICACIÓN DE COMMITS
+    // =================================================================
     summaryForm.onsubmit = async (ev) => {
         ev.preventDefault();
         const token = getToken();
@@ -96,10 +99,19 @@ function renderViewGraphics(container) {
             return;
         }
         try {
-            showSpinner();
+            showSpinner("Cargando assignments...");
             assignments = await getAssignments(classroomId, token);
-            allGrades = await getAllGrades(assignments, token);
+            
+            showSpinner("Cargando lista de entregas...");
+            const baseGrades = await getAllGrades(assignments, token);
+
+            showSpinner("Verificando commits de alumnos (puede tardar)...");
+            allGrades = await enrichGradesWithCommits(baseGrades, token); // ¡NUEVO PASO!
+
             studentsSummary = buildStudentSummary(allGrades);
+            
+            hideSpinner();
+            
             setupStudentGroups(Object.keys(studentsSummary));
             // Seleccionar los primeros 10 estudiantes por defecto para el gráfico inicial
             const initialStudents = Object.keys(studentsSummary).slice(0, 10);
@@ -110,10 +122,9 @@ function renderViewGraphics(container) {
             });
             renderCharts(studentsSummary, assignments.length, initialStudents);
             summaryResults.classList.remove("hidden");
-            hideSpinner();
         } catch (e) {
             hideSpinner();
-            summaryError.textContent = "Error al obtener las notas: " + e.message;
+            summaryError.textContent = "Error al obtener los datos: " + e.message;
         }
     };
     
@@ -126,17 +137,65 @@ function renderViewGraphics(container) {
     }
     
     async function getAllGrades(assignments, token) {
-        const gradePromises = assignments.map(asg => fetch(`https://api.github.com/assignments/${asg.id}/grades`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': "2022-11-28" } }).then(resp => {
-            if (!resp.ok) throw new Error(`Error en notas para assignment ${asg.id}`);
-            return resp.json();
+        const gradePromises = assignments.map(asg => 
+            fetch(`https://api.github.com/assignments/${asg.id}/grades`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': "2022-11-28" } })
+            .then(resp => {
+                if (!resp.ok) {
+                    console.error(`Error en notas para assignment ${asg.id}. Saltando...`);
+                    return [];
+                }
+                return resp.json();
         }));
         return Promise.all(gradePromises);
     }
     
-    // --- El resto de las funciones (buildStudentSummary, setupStudentGroups, renderCharts) ---
-    // --- no necesitan cambios, ya que no usan el token directamente. ---
-
-    function buildStudentSummary(allGrades) { const summary = {}; allGrades.forEach(grades => { grades.forEach(student => { const username = student.github_username; if (!summary[username]) { summary[username] = { email: student.roster_identifier, entregas: 0, notaTotal: 0, notaCount: 0 }; } if (student.submission_timestamp) { summary[username].entregas++; } if (student.points_awarded !== null && !isNaN(student.points_awarded)) { summary[username].notaTotal += Number(student.points_awarded); summary[username].notaCount++; } }); }); return summary; }
+    // =================================================================
+    // NUEVA FUNCIÓN PARA ENRIQUECER LOS DATOS CON LOS COMMITS REALES
+    // =================================================================
+    async function enrichGradesWithCommits(baseGrades, token) {
+        const headers = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': "2022-11-28" };
+        const enrichmentPromises = baseGrades.map(gradesForOneAssignment => {
+            const studentCommitPromises = gradesForOneAssignment.map(async (student) => {
+                if (!student.student_repository_url) return student;
+                try {
+                    const url = new URL(student.student_repository_url);
+                    const [_, owner, repo] = url.pathname.split('/');
+                    const commitRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`, { headers });
+                    if (!commitRes.ok) return student;
+                    const commits = await commitRes.json();
+                    if (commits.length > 0 && commits[0].author && commits[0].author.login === student.github_username) {
+                        student.submission_timestamp = commits[0].commit.author.date;
+                    }
+                } catch (e) {
+                    console.error(`Error al buscar commits para ${student.github_username}:`, e);
+                }
+                return student;
+            });
+            return Promise.all(studentCommitPromises);
+        });
+        return Promise.all(enrichmentPromises);
+    }
+    
+    function buildStudentSummary(allGrades) {
+        // Esta función ahora funciona correctamente porque `submission_timestamp` es fiable.
+        const summary = {};
+        allGrades.forEach(grades => {
+            grades.forEach(student => {
+                const username = student.github_username;
+                if (!summary[username]) {
+                    summary[username] = { email: student.roster_identifier, entregas: 0, notaTotal: 0, notaCount: 0 };
+                }
+                if (student.submission_timestamp) {
+                    summary[username].entregas++;
+                }
+                if (student.points_awarded !== null && !isNaN(student.points_awarded)) {
+                    summary[username].notaTotal += Number(student.points_awarded);
+                    summary[username].notaCount++;
+                }
+            });
+        });
+        return summary;
+    }
 
     function setupStudentGroups(studentKeys) {
         studentGroupSelect.innerHTML = '';

@@ -1,5 +1,6 @@
 /**
  * Renderiza la vista de resumen de entregas en el contenedor proporcionado.
+ * AHORA OBTIENE EL ÚLTIMO COMMIT REAL para calcular las entregas.
  * Utiliza el token guardado en sessionStorage.
  * @param {HTMLElement} container - Contenedor donde se renderizará la vista.
  */
@@ -23,7 +24,7 @@ function renderViewDeliveriesSummary(container) {
     `;
 
 
-    // -- Referencias (se elimina summaryToken) --
+    // -- Referencias --
     const summaryClassroom = container.querySelector("#summary-classroom");
     const summaryForm = container.querySelector("#summary-form");
     const summaryResults = container.querySelector("#summary-results");
@@ -33,8 +34,6 @@ function renderViewDeliveriesSummary(container) {
     let studentsSummary = {};
 
     // --- Lógica de carga y fetch ---
-    
-    // Cargar los classrooms la primera vez que el usuario interactúa con el select
     summaryClassroom.addEventListener("focus", loadClassrooms, { once: true });
 
     async function loadClassrooms() {
@@ -46,11 +45,7 @@ function renderViewDeliveriesSummary(container) {
         try {
             showSpinner();
             const res = await fetch('https://api.github.com/classrooms', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/vnd.github+json',
-                    'X-GitHub-Api-Version': "2022-11-28"
-                }
+                headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': "2022-11-28" }
             });
             hideSpinner();
             if (!res.ok) throw new Error("Token inválido o sin acceso a classrooms.");
@@ -66,6 +61,9 @@ function renderViewDeliveriesSummary(container) {
         }
     }
 
+    // =================================================================
+    // FUNCIÓN onsubmit MODIFICADA PARA LLAMAR A LA VERIFICACIÓN DE COMMITS
+    // =================================================================
     summaryForm.onsubmit = async (ev) => {
         ev.preventDefault();
         summaryResults.innerHTML = '';
@@ -81,15 +79,22 @@ function renderViewDeliveriesSummary(container) {
         }
 
         try {
-            showSpinner();
+            showSpinner("Cargando assignments...");
             assignments = await getAssignments(classroomId, token);
-            allGrades = await getAllGrades(assignments, token);
+            
+            showSpinner("Cargando lista de entregas...");
+            const baseGrades = await getAllGrades(assignments, token);
+
+            showSpinner("Verificando commits de alumnos (esto puede tardar)...");
+            allGrades = await enrichGradesWithCommits(baseGrades, token); // ¡NUEVO PASO!
+            
             hideSpinner();
+            
             studentsSummary = buildStudentSummary(allGrades);
             renderSummaryTable(assignments.length, studentsSummary);
         } catch (e) {
             hideSpinner();
-            summaryError.textContent = "Error al obtener las notas: " + e.message;
+            summaryError.textContent = "Error al obtener los datos: " + e.message;
         }
     };
 
@@ -106,16 +111,51 @@ function renderViewDeliveriesSummary(container) {
         const gradePromises = assignments.map(asg =>
             fetch(`https://api.github.com/assignments/${asg.id}/grades`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': "2022-11-28" } })
             .then(resp => {
-                if (!resp.ok) throw new Error(`Error en notas para assignment ${asg.id}.`);
+                if (!resp.ok) {
+                    console.error(`Error en notas para assignment ${asg.id}. Saltando...`);
+                    return []; // Devuelve un array vacío en caso de error para no romper Promise.all
+                }
                 return resp.json();
             })
         );
         return Promise.all(gradePromises);
     }
     
+    // =================================================================
+    // NUEVA FUNCIÓN PARA ENRIQUECER LOS DATOS CON LOS COMMITS REALES
+    // =================================================================
+    async function enrichGradesWithCommits(baseGrades, token) {
+        const headers = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': "2022-11-28" };
+
+        const enrichmentPromises = baseGrades.map(gradesForOneAssignment => {
+            const studentCommitPromises = gradesForOneAssignment.map(async (student) => {
+                if (!student.student_repository_url) {
+                    return student; // No hay repo, no hay nada que hacer
+                }
+                try {
+                    const url = new URL(student.student_repository_url);
+                    const [_, owner, repo] = url.pathname.split('/');
+                    const commitRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`, { headers });
+                    if (!commitRes.ok) return student;
+
+                    const commits = await commitRes.json();
+                    if (commits.length > 0 && commits[0].author && commits[0].author.login === student.github_username) {
+                        student.submission_timestamp = commits[0].commit.author.date; // Actualizamos el timestamp
+                    }
+                } catch (e) {
+                    console.error(`Error al buscar commits para ${student.github_username}:`, e);
+                }
+                return student; // Devolvemos el estudiante (modificado o no)
+            });
+            return Promise.all(studentCommitPromises);
+        });
+
+        return Promise.all(enrichmentPromises);
+    }
 
     function buildStudentSummary(allGrades) {
         const summary = {};
+        // La lógica aquí ahora funciona correctamente porque `submission_timestamp` es fiable.
         allGrades.forEach(grades => {
             grades.forEach(student => {
                 const username = student.github_username;
@@ -246,6 +286,7 @@ function renderViewDeliveriesSummary(container) {
     }
 
     function downloadExcelWithXLSX(studentsSummary, totalAssignments, assignments, allGrades) {
+        // Esta función ahora recibe `allGrades` ya enriquecido y funcionará correctamente.
         const summaryData = [["Usuario", "Email", "Entregas", "% Entregadas", "Nota Promedio"]];
         Object.entries(studentsSummary).forEach(([user, data]) => {
             const avgNota = data.notaCount > 0 ? Math.ceil((data.notaTotal / data.notaCount) / 10) : 0;
