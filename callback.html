@@ -1,62 +1,132 @@
-
-<!-- callback.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <meta charset="UTF-8"/>
     <title>Autenticando...</title>
-     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-gradient-to-br from-slate-950 via-black to-blue-950/50 flex items-center justify-center h-screen">
-    <div class="flex flex-col items-center gap-4">
+<body class="bg-gradient-to-br from-slate-950 via-black to-blue-950/50 flex items-center justify-center min-h-screen">
+
+<div class="glass-panel text-center p-10 rounded-xl space-y-4 max-w-sm w-full mx-4">
+    <div id="spinner" class="flex flex-col items-center gap-4">
         <div class="h-12 w-12 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
         <p id="status-text" class="text-cyan-300 text-lg font-semibold tracking-widest">AUTENTICANDO...</p>
+        <p id="status-sub" class="text-slate-400 text-sm"></p>
     </div>
+    <div id="error-panel" class="hidden space-y-4">
+        <div class="text-4xl">⚠️</div>
+        <p id="error-text" class="text-red-400 font-semibold"></p>
+        <p class="text-slate-400 text-sm">Redirigiendo al login...</p>
+        <button onclick="window.location.replace('/login.html')" 
+            class="w-full border border-cyan-600 text-cyan-400 px-4 py-2 rounded-md text-sm transition hover:bg-cyan-600/20">
+            Ir al login ahora
+        </button>
+    </div>
+</div>
 
-    <script>
-        // 1. Obtener el 'code' de los parámetros de la URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
+<script>
+    function showError(msg) {
+        document.getElementById('spinner').classList.add('hidden');
+        document.getElementById('error-panel').classList.remove('hidden');
+        document.getElementById('error-text').textContent = msg;
+        setTimeout(() => window.location.replace('/login.html'), 4000);
+    }
 
-        if (code) {
-            // 2. Llamar a nuestra Netlify Function para que haga el trabajo sucio
-            fetch('/.netlify/functions/get-github-token', { // Esta es la ruta a tu función
+    function setStatus(main, sub) {
+        document.getElementById('status-text').textContent = main;
+        document.getElementById('status-sub').textContent = sub || '';
+    }
+
+    async function handleCallback() {
+        const params = new URLSearchParams(window.location.search);
+        const code   = params.get('code');
+        const state  = params.get('state');
+        const error  = params.get('error');
+
+        // Error devuelto por GitHub (ej: acceso denegado)
+        if (error) {
+            showError(params.get('error_description') || `GitHub rechazó el acceso: ${error}`);
+            return;
+        }
+
+        if (!code) {
+            showError('No se recibió el código de autorización. Intentá de nuevo.');
+            return;
+        }
+
+        // Validar state para prevenir CSRF (si se guardó)
+        const savedState = sessionStorage.getItem('oauth_state');
+        if (savedState && state !== savedState) {
+            showError('Error de seguridad: el estado no coincide. Intentá de nuevo.');
+            return;
+        }
+        sessionStorage.removeItem('oauth_state');
+
+        // Limpiar la URL para evitar re-uso del code si se recarga la página
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+        try {
+            setStatus('AUTENTICANDO...', 'Intercambiando código por token');
+
+            const res = await fetch('/.netlify/functions/get-github-token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: code })
-            })
-            .then(res => {
-                if (!res.ok) {
-                    return res.json().then(errorData => {
-                        throw new Error(errorData.error_description || 'Error en el servidor de autenticación');
-                    });
-                }
-                return res.json();
-            })
-            .then(data => {
-                if (data.access_token) {
-                    // 3. ¡Éxito! Guardar el token y redirigir
-                    sessionStorage.setItem('github_token', data.access_token);
-                    window.location.replace('/index.html'); 
-                } else {
-                    // Manejar errores devueltos por la API de GitHub a través de nuestra función
-                    throw new Error(data.error_description || 'No se recibió el token de acceso.');
-                }
-            })
-            .catch(err => {
-                // 4. Capturar cualquier error y mostrarlo
-                document.getElementById('status-text').textContent = 'Error de autenticación.';
-                alert(err.message);
-                // Redirigir de vuelta al login después de un error
-                setTimeout(() => window.location.replace('/login.html'), 2000);
+                body: JSON.stringify({ code })
             });
-        } else {
-            // Si no hay código en la URL
-            const error = urlParams.get('error_description') || 'No se recibió el código de autorización.';
-            alert('Error: ' + error);
-            window.location.replace('/login.html');
+
+            const data = await res.json();
+
+            if (!res.ok || data.error) {
+                const errMsg = data.error_description || data.error || `Error del servidor (${res.status})`;
+                // Si el code ya fue usado, es un error de "bad_verification_code"
+                if (data.error === 'bad_verification_code') {
+                    showError('El código de autorización ya fue usado o expiró. Iniciá sesión de nuevo.');
+                } else {
+                    showError(errMsg);
+                }
+                return;
+            }
+
+            if (!data.access_token) {
+                showError('No se recibió el token de acceso. Revisá los permisos del OAuth App.');
+                return;
+            }
+
+            setStatus('VERIFICANDO PERMISOS...', 'Comprobando acceso a classrooms');
+
+            // Verificar que el token funciona y obtener info del usuario
+            const userRes = await fetch('https://api.github.com/user', {
+                headers: {
+                    'Authorization': `Bearer ${data.access_token}`,
+                    'Accept': 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2022-11-28'
+                }
+            });
+
+            if (!userRes.ok) {
+                showError('El token recibido no es válido. Intentá de nuevo.');
+                return;
+            }
+
+            const user = await userRes.json();
+            sessionStorage.setItem('github_token', data.access_token);
+            sessionStorage.setItem('github_user', JSON.stringify({
+                login: user.login,
+                name:  user.name || user.login,
+                avatar_url: user.avatar_url
+            }));
+
+            setStatus(`¡Bienvenido, ${user.login}!`, 'Redirigiendo...');
+            setTimeout(() => window.location.replace('/index.html'), 800);
+
+        } catch(e) {
+            showError(`Error de red: ${e.message}. Verificá tu conexión.`);
         }
-    </script>
+    }
+
+    handleCallback();
+</script>
 </body>
 </html>
