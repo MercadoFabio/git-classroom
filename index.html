@@ -43,10 +43,17 @@
             <button id="nav-progress-matrix" class="nav-btn w-full text-left font-semibold text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10 px-4 py-3 rounded-md transition-all duration-200" type="button">📈 Matriz de Progreso</button>
         </div>
         
-        <!-- PASO 3.B: BOTÓN DE CERRAR SESIÓN -->
-        <div class="p-4 mt-auto border-t border-cyan-400/10">
-            <button id="logout-btn" class="w-full text-left font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 px-4 py-3 rounded-md transition-all duration-200 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" /></svg>
+        <!-- Usuario logueado + logout -->
+        <div class="p-4 mt-auto border-t border-cyan-400/10 space-y-3">
+            <div id="sidebar-user" class="flex items-center gap-3 hidden">
+                <img id="sidebar-avatar" src="" alt="avatar" class="w-8 h-8 rounded-full border border-cyan-400/30"/>
+                <div class="min-w-0">
+                    <p id="sidebar-username" class="text-xs font-semibold text-slate-300 truncate"></p>
+                    <p class="text-[10px] text-slate-500">GitHub</p>
+                </div>
+            </div>
+            <button id="logout-btn" class="w-full text-left font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 px-4 py-2.5 rounded-md transition-all duration-200 flex items-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" /></svg>
                 Cerrar Sesión
             </button>
         </div>
@@ -101,15 +108,26 @@
 <script src="js/view-progress-matrix.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- PASO 3.C: LÓGICA DEL BOTÓN DE CERRAR SESIÓN -->
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        // Mostrar usuario en sidebar
+        try {
+            const user = JSON.parse(sessionStorage.getItem('github_user') || 'null');
+            if (user) {
+                document.getElementById('sidebar-avatar').src = user.avatar_url;
+                document.getElementById('sidebar-username').textContent = user.login;
+                document.getElementById('sidebar-user').classList.remove('hidden');
+            }
+        } catch {}
+
+        // Logout limpio: borra todo y va al login
         const logoutBtn = document.getElementById('logout-btn');
-        if(logoutBtn) {
+        if (logoutBtn) {
             logoutBtn.addEventListener('click', () => {
-                // Borra el token de la sesión
                 sessionStorage.removeItem('github_token');
-                // Redirige a la página de login
+                sessionStorage.removeItem('github_user');
+                sessionStorage.removeItem('oauth_state');
+                // Redirigir al login con flag para no auto-redirigir de vuelta
                 window.location.replace('/login.html');
             });
         }
