@@ -1,28 +1,178 @@
-<!-- login.html -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>UTN Classroom Helper — Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css"></head>
-<body class="bg-gradient-to-br from-slate-950 via-black to-blue-950/50 flex items-center justify-center h-screen">
-    <div class="glass-panel text-center p-10 rounded-xl">
-        <h1 class="text-3xl font-bold text-cyan-300 mb-4 tracking-wider">GitHub Classroom Helper</h1>
-        <p class="text-slate-400 mb-8">Inicia sesión con tu cuenta de GitHub para continuar</p>
-        <button id="login-btn" class="w-full bg-cyan-600 text-slate-900 font-bold py-3 px-4 rounded-md shadow-lg shadow-cyan-500/20 hover:bg-cyan-500">
-            Iniciar Sesión con GitHub
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gradient-to-br from-slate-950 via-black to-blue-950/50 flex items-center justify-center min-h-screen p-4">
+
+<div class="glass-panel w-full max-w-md rounded-xl p-8 space-y-6">
+    <div class="text-center space-y-2">
+        <h1 class="text-3xl font-bold text-cyan-300 tracking-wider">GCH v2.0</h1>
+        <p class="text-slate-400 text-sm">GitHub Classroom Helper — UTN FRC</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex rounded-lg overflow-hidden border border-slate-700">
+        <button id="tab-oauth" onclick="switchTab('oauth')"
+            class="tab-btn flex-1 py-2.5 text-sm font-semibold transition-all bg-cyan-600/30 text-cyan-300">
+            GitHub OAuth
+        </button>
+        <button id="tab-pat" onclick="switchTab('pat')"
+            class="tab-btn flex-1 py-2.5 text-sm font-semibold transition-all text-slate-400 hover:text-slate-200">
+            Token Personal
         </button>
     </div>
 
-    <script src="js/config.js"></script>
-    <script>
-        document.getElementById('login-btn').addEventListener('click', () => {
-            const client_id = GITHUB_CONFIG.CLIENT_ID;
-            const scope = GITHUB_CONFIG.SCOPE;
-            const redirect_uri = window.location.origin + '/callback.html';
-            
-            window.location.href = `https://github.com/login/oauth/authorize?client_id=${client_id}&redirect_uri=${redirect_uri}&scope=${scope}`;
-        });
-    </script>
+    <!-- OAuth panel -->
+    <div id="panel-oauth" class="space-y-4">
+        <p class="text-xs text-slate-400">
+            Autenticación vía GitHub OAuth. Si querés usar una cuenta distinta, ingresá el usuario de GitHub para forzar el cambio.
+        </p>
+        <div>
+            <label class="block text-xs font-semibold text-cyan-200 mb-1.5">Usuario de GitHub (opcional — fuerza cambio de cuenta)</label>
+            <input id="oauth-username" type="text" placeholder="ej: MercadoFabio"
+                class="glass-panel w-full px-3 py-2.5 rounded-md border border-cyan-400/20 focus:ring-2 focus:ring-cyan-400 focus:outline-none text-slate-300 placeholder-slate-500 text-sm"/>
+        </div>
+        <button id="login-oauth-btn" type="button"
+            class="w-full flex items-center justify-center gap-3 bg-cyan-600 text-slate-900 font-bold py-3 px-4 rounded-md shadow-lg shadow-cyan-500/20 hover:bg-cyan-500 transition-all">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            Iniciar Sesión con GitHub
+        </button>
+        <p class="text-[11px] text-slate-500 text-center">
+            Abre GitHub para autorizarte. Al cerrar sesión podés cambiar de cuenta ingresando un usuario distinto arriba.
+        </p>
+    </div>
+
+    <!-- PAT panel -->
+    <div id="panel-pat" class="space-y-4 hidden">
+        <p class="text-xs text-slate-400">
+            Ingresá un <strong class="text-cyan-300">Personal Access Token</strong> de GitHub. Es la forma más rápida para cambiar de cuenta o entorno sin depender del navegador.
+        </p>
+        <div>
+            <label class="block text-xs font-semibold text-cyan-200 mb-1.5">Personal Access Token</label>
+            <input id="pat-input" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                class="glass-panel w-full px-3 py-2.5 rounded-md border border-cyan-400/20 focus:ring-2 focus:ring-cyan-400 focus:outline-none text-slate-300 placeholder-slate-500 text-sm font-mono"/>
+        </div>
+        <button id="login-pat-btn" type="button"
+            class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-md shadow-lg hover:bg-emerald-500 transition-all">
+            Usar este Token
+        </button>
+        <details class="text-xs text-slate-500">
+            <summary class="cursor-pointer text-slate-400 hover:text-slate-300">¿Cómo generar un token?</summary>
+            <ol class="mt-2 space-y-1 pl-3 list-decimal">
+                <li>GitHub → Settings → Developer settings</li>
+                <li>Personal access tokens → Tokens (classic)</li>
+                <li>Generate new token</li>
+                <li>Permisos: <code class="text-cyan-400">read:org</code>, <code class="text-cyan-400">repo</code>, <code class="text-cyan-400">read:user</code></li>
+            </ol>
+        </details>
+    </div>
+
+    <!-- Error -->
+    <div id="login-error" class="hidden text-red-400 text-sm text-center font-medium p-3 bg-red-500/10 rounded-lg border border-red-500/20"></div>
+
+    <!-- Loading -->
+    <div id="login-loading" class="hidden flex flex-col items-center gap-3 py-2">
+        <div class="h-8 w-8 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+        <p id="login-loading-text" class="text-cyan-300 text-sm font-semibold tracking-widest">VERIFICANDO...</p>
+    </div>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+    // ── Si ya hay token válido, ir directo a la app ────────────────
+    if (sessionStorage.getItem('github_token')) {
+        window.location.replace('/index.html');
+    }
+
+    function switchTab(tab) {
+        const isOAuth = tab === 'oauth';
+        document.getElementById('panel-oauth').classList.toggle('hidden', !isOAuth);
+        document.getElementById('panel-pat').classList.toggle('hidden', isOAuth);
+        document.getElementById('tab-oauth').className = `tab-btn flex-1 py-2.5 text-sm font-semibold transition-all ${isOAuth ? 'bg-cyan-600/30 text-cyan-300' : 'text-slate-400 hover:text-slate-200'}`;
+        document.getElementById('tab-pat').className   = `tab-btn flex-1 py-2.5 text-sm font-semibold transition-all ${!isOAuth ? 'bg-emerald-600/30 text-emerald-300' : 'text-slate-400 hover:text-slate-200'}`;
+        clearError();
+    }
+
+    function showError(msg) {
+        const el = document.getElementById('login-error');
+        el.textContent = msg; el.classList.remove('hidden');
+    }
+    function clearError() { document.getElementById('login-error').classList.add('hidden'); }
+
+    function showLoading(msg) {
+        document.getElementById('login-loading-text').textContent = msg;
+        document.getElementById('login-loading').classList.remove('hidden');
+        document.getElementById('login-oauth-btn').disabled = true;
+        document.getElementById('login-pat-btn').disabled = true;
+    }
+    function hideLoading() {
+        document.getElementById('login-loading').classList.add('hidden');
+        document.getElementById('login-oauth-btn').disabled = false;
+        document.getElementById('login-pat-btn').disabled = false;
+    }
+
+    // ── OAuth ──────────────────────────────────────────────────────
+    document.getElementById('login-oauth-btn').addEventListener('click', () => {
+        clearError();
+        const username   = document.getElementById('oauth-username').value.trim();
+        const client_id  = GITHUB_CONFIG.CLIENT_ID;
+        const scope      = GITHUB_CONFIG.SCOPE;
+        const redirect   = window.location.origin + '/callback.html';
+        const state      = crypto.randomUUID(); // evita replay attacks y cacheo
+        sessionStorage.setItem('oauth_state', state);
+
+        let url = `https://github.com/login/oauth/authorize?client_id=${client_id}&redirect_uri=${encodeURIComponent(redirect)}&scope=${encodeURIComponent(scope)}&state=${state}`;
+        if (username) url += `&login=${encodeURIComponent(username)}`;
+
+        window.location.href = url;
+    });
+
+    // ── PAT ────────────────────────────────────────────────────────
+    document.getElementById('login-pat-btn').addEventListener('click', async () => {
+        clearError();
+        const pat = document.getElementById('pat-input').value.trim();
+        if (!pat) { showError('Ingresá un token antes de continuar.'); return; }
+        if (!pat.startsWith('ghp_') && !pat.startsWith('github_pat_')) {
+            showError('El token no tiene el formato esperado (debe empezar con ghp_ o github_pat_).'); return;
+        }
+        showLoading('VERIFICANDO TOKEN...');
+        try {
+            const res = await fetch('https://api.github.com/user', {
+                headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
+            });
+            if (!res.ok) throw new Error(res.status === 401 ? 'Token inválido o expirado.' : `Error GitHub: ${res.status}`);
+            const user = await res.json();
+
+            // Verificar scope read:org (necesario para classrooms)
+            const scopeHeader = res.headers.get('x-oauth-scopes') || '';
+            if (!scopeHeader.includes('read:org') && !scopeHeader.includes('admin:org')) {
+                throw new Error(`El token no tiene el permiso "read:org". Scopes actuales: ${scopeHeader || '(ninguno)'}`);
+            }
+
+            sessionStorage.setItem('github_token', pat);
+            sessionStorage.setItem('github_user', JSON.stringify({
+                login: user.login,
+                name:  user.name || user.login,
+                avatar_url: user.avatar_url
+            }));
+            window.location.replace('/index.html');
+        } catch(e) {
+            hideLoading();
+            showError(e.message);
+        }
+    });
+
+    // Enter en el PAT input
+    document.getElementById('pat-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') document.getElementById('login-pat-btn').click();
+    });
+</script>
 </body>
 </html>
