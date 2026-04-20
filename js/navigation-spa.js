@@ -7,12 +7,14 @@
 function switchView(view) {
     // Ocultar todas las vistas excepto la activa
     document.getElementById("view-assignments").classList.toggle("hidden", view !== "assignments");
+    document.getElementById("view-progress-matrix").classList.toggle("hidden", view !== "progress-matrix");
     document.getElementById("view-grades").classList.toggle("hidden", view !== "grades");
     document.getElementById("view-deliveries-summary").classList.toggle("hidden", view !== "deliveries-summary");
     document.getElementById("view-graphics").classList.toggle("hidden", view !== "graphics");
 
     // Actualizar el estado 'aria-current' para el estilo del botón activo
     document.getElementById("nav-create").setAttribute("aria-current", view === "assignments" ? "page" : "");
+    document.getElementById("nav-progress-matrix").setAttribute("aria-current", view === "progress-matrix" ? "page" : "");
     document.getElementById("nav-deliveries").setAttribute("aria-current", view === "grades" ? "page" : "");
     document.getElementById("nav-deliveries-summary").setAttribute("aria-current", view === "deliveries-summary" ? "page" : "");
     document.getElementById("nav-graphics").setAttribute("aria-current", view === "graphics" ? "page" : "");
@@ -30,6 +32,7 @@ document.getElementById("nav-create").onclick = () => switchView("assignments");
 document.getElementById("nav-deliveries").onclick = () => switchView("grades");
 document.getElementById("nav-deliveries-summary").onclick = () => switchView("deliveries-summary");
 document.getElementById("nav-graphics").onclick = () => switchView("graphics");
+document.getElementById("nav-progress-matrix").onclick = () => switchView("progress-matrix");
 
 /**
  * Inicializa las vistas principales de la aplicación al cargar el DOM.
@@ -46,6 +49,7 @@ window.addEventListener("DOMContentLoaded", () => {
         renderViewGrades(document.getElementById("view-grades"));
         renderViewDeliveriesSummary(document.getElementById("view-deliveries-summary"));
         renderViewGraphics(document.getElementById("view-graphics"));
+        renderViewProgressMatrix(document.getElementById("view-progress-matrix"));
         
         // También inicializamos la lógica del botón de cerrar sesión aquí,
         // ya que este script se ejecuta en la página principal.
