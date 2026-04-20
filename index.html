@@ -40,6 +40,7 @@
             <button id="nav-deliveries" class="nav-btn w-full text-left font-semibold text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10 px-4 py-3 rounded-md transition-all duration-200" type="button">Ver Notas y Entregas</button>
             <button id="nav-deliveries-summary" class="nav-btn w-full text-left font-semibold text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10 px-4 py-3 rounded-md transition-all duration-200" type="button">Resumen de Entregas</button>
             <button id="nav-graphics" class="nav-btn w-full text-left font-semibold text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10 px-4 py-3 rounded-md transition-all duration-200" type="button">Gráficos</button>
+            <button id="nav-progress-matrix" class="nav-btn w-full text-left font-semibold text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10 px-4 py-3 rounded-md transition-all duration-200" type="button">📈 Matriz de Progreso</button>
         </div>
         
         <!-- PASO 3.B: BOTÓN DE CERRAR SESIÓN -->
@@ -68,6 +69,7 @@
                 <section id="view-grades" class="w-full flex-1 hidden"></section>
                 <section id="view-deliveries-summary" class="w-full flex-1 hidden"></section>
                 <section id="view-graphics" class="w-full flex-1 hidden"></section>
+                <section id="view-progress-matrix" class="w-full flex-1 hidden"></section>
             </div>
             
             <!-- Spinner -->
@@ -94,7 +96,9 @@
 <script src="js/spinner.js"></script>
 <script src="js/token-modal.js"></script>
 <script src="js/view-graphics.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="js/github-api.js"></script>
+<script src="js/view-progress-matrix.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <!-- PASO 3.C: LÓGICA DEL BOTÓN DE CERRAR SESIÓN -->
